@@ -1,0 +1,65 @@
+Constant __eq__(X,Y)
+Constant __impl__(X,Y)
+Notation __eq__     _ = _ OUTSIDE (
+Notation __impl__   _ => _ OUTSIDE = ASSOCRIGHT
+
+Axiom eq_refl : X = X
+Axiom eq_cong : X = Y => PRED(X) => PRED(Y)
+Axiom dummy_assump : X => (A => X)
+
+Constant false
+Axiom false : false => X
+
+Definition _neg(X) := X => false
+Notation _neg ! _ INSIDE =
+Definition true := !false
+Axiom double_neg : !!X => X
+
+Definition _or(X,Y) := !X => Y
+Notation _or   _ || _ OUTSIDE = ASSOCRIGHT
+
+Definition _is_bool(X) := X = false || X = true
+Notation _is_bool    _ is_bool   PRECEDENCE =
+Axiom eq_is_bool : (X = Y) is_bool
+Axiom impl_is_bool : (X => Y) is_bool
+
+Definition to_bool(X) := !!X
+
+Constant _if(C, X,Y)
+Notation _if   if _ ; _ else _   OUTSIDE =>
+Axiom if_true : C => (if C; A else B) = A
+Axiom if_false : !C => (if C; A else B) = B
+
+Definition _and(X,Y) := !X !|| !Y
+Definition _equiv(X,Y) := (to_bool(X) = to_bool(Y))
+Notation _equiv   _ <=> _   OUTSIDE =>
+Definition _xor(X,Y) := X !<=> Y
+Notation _xor     _ ^^ _    OUTSIDE = INSIDE =>
+Notation _and     _ && _    OUTSIDE = INSIDE => ASSOCRIGHT
+
+Constant null
+Definition _require(C,Y) := if C; Y else null
+Definition _try(X,Y) := if X != null; X else Y
+Notation _require   require _ ; _ PRECEDENCE if
+Notation _try       try _ else _  PRECEDENCE if
+Definition to_bool1(X) := X = null || X
+
+Constant example(x : PRED(x))
+Axiom example_universal : PRED(X) => PRED(example(x : PRED(x)))
+Axiom example_null : !PRED(example(x : PRED(x))) => example(x : PRED(x)) = null
+Definition exists(x : PRED(x)) := to_bool(PRED(example(x : PRED(x))))
+Definition forall(x : PRED(x)) := !exists(x : !to_bool1(PRED(x)))
+Axiom example_well_founded :
+  forall(x : PRED(x) => PRED2(x)) =>
+  PRED(example(x : PRED2(x))) =>
+  example(x : PRED(x)) = example(x : PRED2(x))
+Definition exists_uq(x : PRED(x)) := exists(x : PRED(x) && forall(y : PRED(y) => x = y))
+Definition unique(x : PRED(x)) := require exists_uq(x : PRED(x)); example(x : PRED(x))
+Definition take(x : PRED(x)) := unique(res : res != null && exists(x : res = PRED(x)))
+Definition let(A, x : PRED(x)) := PRED(A)
+
+Constant _is_sane(x)
+Notation _is_sane   _ is_sane   PRECEDENCE =
+Axiom bool_is_sane : X is_bool => X is_sane
+Axiom null_is_not_sane : null !is_sane
+Axiom null_to_bool : to_bool(null) = false

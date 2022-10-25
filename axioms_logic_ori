@@ -1,0 +1,69 @@
+Constant imply(X,Y)
+Constant equals(X,Y)
+Axiom refl : X == X
+Axiom rel_cong : X == Y => X => Y
+Axiom fun_cong : X == Y => BODY(X) == BODY(Y)
+Constant true
+Constant false
+
+Axiom true : true
+
+Axiom true_impl_eq : true == (X => true)
+Axiom impl_false_eq : true == (false => X)
+Axiom false_impl_true_eq : false == impl(false => true)
+
+Definition neg(X) := X => false
+Definition or(X,Y) := ~X => Y
+
+Definition is_bool(X) := false == X || true == X
+Axiom eq_is_bool : (X == Y) is_bool
+Axiom impl_is_bool : (X => Y) is_bool
+Axiom or_elim : (A => C) => (B => C) => (A || B) => C
+
+Definition to_bool(X) := ~~X
+Axiom impl_autoconvert : (A => B) == (to_bool(A) => to_bool(B))
+
+Constant ite(C, X,Y)
+Axiom ite_true : (if true then A else B) == A
+Axiom ite_false : (if false then A else B) == B
+Axiom ite_autoconvert : (if C then A else B) == (if to_bool(C) then A else B)
+
+Definition and(X,Y) == ~(~A || ~B)
+Definition equiv(X,Y) == (to_bool(X) == to_bool(Y))
+Definition xor(X,Y) == ~(X <=> Y)
+
+Constant null
+Definition require_in(C,Y) == if C then Y else null
+Definition try_else(X,Y) == if X != null then X else Y
+Definition to_bool1(X) == if X == null then true else to_bool(X)
+
+Binder exists(1)
+Axiom exists_elim : (exists x : BODY(x)) => BODY(example(x : BODY(x)))
+Axiom exists_intro : BODY(X) => (exists x : BODY(x))
+Axiom exists_is_bool : (exists x : BODY(x)) is_bool
+
+Binder forall(x : BODY(x))
+Binder exists!(x : BODY(x))
+Binder example(x : BODY(x))
+Binder unique(x : BODY(x))
+Binder take_in(x : BODY(x))
+Axiom forall_def : (forall x : BODY(x)) == ~exists(x : ~to_bool1(BODY(x)))
+Axiom exists_uq_def : (exists! x : BODY(x)) == (exists x : BODY(x) && forall y : BODY(y) => y == x)
+Axiom unique_def :
+  unique(x : BODY(x)) ==
+    require exists! x : BODY(x);
+    example(x : BODY(x))
+Axiom example_ext : (forall x : BODY(x) <=> BODY2(x)) => example(x : BODY(x)) == example(x : BODY(x))
+Axiom nexists_example : ~(exists x : BODY(x)) => example(x : BODY(x)) == null
+Axiom take_def : take_in(x : BODY(x)) == unique(y : y != null && exists x : BODY(x))
+
+constant is_object 1
+Axiom bool_is_object : X is_bool => X is_object
+Axiom null_is_not_object : null not_object
+Axiom null_to_bool : to_bool(null) == false
+
+
+
+
+BODY(X) => BODY(example(x:BODY(x)))
+(forall x; BODY(x) => BODY2(x)) => BODY(example(x:BODY(x))) => example(x:BODY(x)) = example(x:BODY2(x))

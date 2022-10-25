@@ -1,0 +1,89 @@
+Binder set(1)
+Binder let_in(0,1)
+Binder lambda(1)
+Constant is_set(X) is_bool
+Axiom is_set : {x : BODY(x)} is_set
+Axiom not_set : (X is_bool || X == null) => X not_set
+Definition is_small_set(X) == X is_set && X is_object
+Definition empty_set := { x : false }
+
+Begin
+Convention X is_object
+Convention A is_set
+Convention B is_set
+
+Constant is_in(X, A) is_bool
+Axiom set_def : X in { x : BODY(x) } == BODY(X)
+Axiom set_to_bool : to_bool(A) == (A == {})
+
+Axiom is_in_bool : X in A is_bool
+Axiom set_ext : (forall x : (x in A) <=> (x in B)) => A == B
+
+Definition subset_eq(A,B) := forall x in A: x in B
+Definition supset_eq(A,B) := B <:= A
+Definition subset(A,B) := A <:= B && A != B
+Definition supset(A,B) := B <: A
+
+Definition union2(A,B) := { x : x in A || x in B }
+Definition intersect2(A,B) := { x : x in A && x in B }
+Definition union(A) := { x : exists y in A : x in y }
+Definition intersect(A) := { x : forall y in A : x in y }
+Definition powerset(A) := { x <:= A }
+Definition unique(A) := unique(x : x in A)
+
+Definition bools := { x is_bool }
+Definition sets := { x is_set }
+
+# Set theoretic constructions
+
+Convention A is_object
+Convention B is_object
+
+Axiom set_pair : is_object { A; B }
+Axiom union : union(A) is_object
+Axiom powerset : powerset(A) is_object
+Axiom subset : (U <:= A) => is_object(U)
+End
+
+# Functions
+
+Axiom let_in_def : (x := A; BODY(X)) == BODY(X)
+Constant is_func(X) is_bool
+Definition empty_fun := ( x |-> null )
+
+Begin
+Convention f is_func
+Convention g is_func
+
+Axiom func_to_bool : to_bool(f) == (f == (x |-> false))
+
+Constant app(f,X)
+Axiom fun_ext : (forall x : f(x) == g(x)) => f == g
+
+Axiom is_func : (x |-> BODY(x)) is_func
+Axiom func_app : (x |-> BODY(x))(X) == (x := A; require x is_object; BODY(x))
+Axiom not_func : (X is_set || X is_bool || X == null) => X not_func
+Definition is_small_func(F) : is_func(F) && is_object(F)
+
+# Function operations
+
+# Notation: ( x |-> f(x) ; x |-> g(x) ) ===> x |-> try g(x) else f(x)
+Definition update_func(f, X is_object, Y is_object) := (x |-> f(x); X |-> Y)
+Definition update_func_in(f, X, Y) := require f(X) != null; update_func(f, X, Y)
+
+Definition domain(f) := { x : f(x) != null }
+Definition image(f) := { f(x) }
+Axiom func_object : f is_object <=> domain(f) is_object
+Axiom replacement : f is_object => image(f) is_object
+Definition restrict(f, S is_set) := ( x |-> require x in S; f(x) ) # notation f |_ S
+Definition constant(X is_object) := ( x |-> X )
+Definition constant(X is_object, S is_set) := restrict(constant(X), S)
+
+Definition arrow(A is_set, B is_set) := { f : domain f == A && image f == B }
+Definition subarrow(A is_set, B is_set) := { f : domain f <:= A && image f <:= B }
+
+Definition is_injective(f) := forall x,y: f(x) == f(y) => x == y || f(x) == null
+Definition inversion(f) := f(x) |-> x # notation: x |-> unique(x : exists y : f(x) == y)
+Definition compose(f,g) := { x |-> f(g(x)) }
+
+End

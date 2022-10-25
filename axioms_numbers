@@ -1,0 +1,91 @@
+Constant reals
+Constant nats
+Axiom nats_reals : nats <:= reals
+
+Constant 0 in nats
+Constant 1 in nats
+Axiom num_nontriv : 0 != 1
+Axiom not_real : (X is_func || X is_set) => X not in reals
+Axiom infinity : reals is_object
+
+# operations on reals
+
+Begin
+Convention x in reals
+Convention y in reals
+Convention z in reals
+Convention u in reals && u != 0
+Convention n in nats
+
+Axiom real_to_bool : to_bool(x) == (x == 0)
+
+Constant plus(x,y) in reals
+Constant uminus(x) in reals
+Constant times(x,y) in reals
+Constant udivide(u) in reals
+Constant less_than_equal(x,y) is_bool
+Definition minus(x,y) := x + (-y)
+Definition divide(x,u) := x * udivide(u)
+Definition less_than(x.y) := x <= y && x != y
+Definition greater_than_equal(x,y) := y <= x
+Definition greater_than(x,y) := y < x
+
+Axiom plus_comm : x + y == y + x
+Axiom plus_assoc : x + (y + z) == (x + y) + z
+Axiom pluz_zero : x + 0 == x
+Axiom uminus : x + (-x) == 0
+Axiom times_comm : x * y == y * x
+Axiom times_assoc : x * (y * z) == (x * y) * z
+Axiom times_one : x * 1 == x
+Axiom times_plus : x * (y + z) == x * y + x * z
+Axiom times_udivide : x * udivide(u) == 1
+Axiom lte_refl : x <= x
+Axiom lte_linear : x <= y || y <= x
+Axiom lte_antisymm : (x <= y && y <= x) => x == y
+Axiom lte_basic : 0 <= 1
+Axiom lte_plus : x <= y => x+z <= y+z
+Axiom lte_times : x <= y => 0 < z => x*z <= y*z
+
+# naturals, ...
+
+Axiom nats : n+1 in nats
+Axiom nat_induction : 
+  PROP(0) => (forall n : PROP(n) => PROP(n+1)) =>
+  forall n : PROP(n)
+
+Definition ints := { n; -n }
+Definition fracs := { i / n : i in ints }
+Definition int_range(a in ints, b in ints) := { i in ints : a <= i <= b } # Notation: a..b
+Definition open_interval(x, y) := { z : a < z < b }
+
+# axioms of real numbers
+
+Axiom archimedean : forall x : exists n : x < n
+Definition upper_bounds(X <:= reals) == { x : forall y in X : y <= x }
+Definition lower_bounds(X <:= reals) == { x : forall y in X : y >= x }
+Definition max(X <:= reals) == unique(X & upper_bounds(X))
+Definition min(X <:= reals) == unique(X & lower_bounds(X))
+Definition supremum(X <: reals) == min(upper_bounds(X))
+Definition infimum(X <: reals) == max(lower_bounds(X))
+
+Axiom supremum : X <:= reals => X != {} && lower_bounds(X) != {} => supremum(X) != null
+
+# Notation: fixpoint g(x) := BODY(g,x)
+# ===> unique(g : (x |-> BODY(g,x)))
+
+Definition iterated(f is_func, start is_object) :=
+  fixpoint g(n) := if x == 0 then start else f(g(n-1))
+
+
+# floor, ceil, mod, floordiv, int_pow, divides
+
+Definition floor(x) := max({ i in ints : i <= x })
+Definition ceil(x) := max({ i in ints : i >= x })
+Definition floordiv(x,u) := floor(x/u)
+Definition mod(x,u) := x - (x // u)*u
+Definition mod1(x,u) := x - ceil(x / u)*u
+Definition divides(x,y) := (x / y) in ints
+
+Definition nat_pow(x,n) := iterated((y |-> y*x), 1)
+
+end
