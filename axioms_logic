@@ -55,11 +55,12 @@ Axiom example_well_founded :
   example(x : PRED(x)) = example(x : PRED2(x))
 Definition exists_uq(x : PRED(x)) := exists(x : PRED(x) && forall(y : PRED(y) => x = y))
 Definition unique(x : PRED(x)) := require exists_uq(x : PRED(x)); example(x : PRED(x))
-Definition take(x : PRED(x)) := unique(res : res != null && exists(x : res = PRED(x)))
-Definition let(A, x : PRED(x)) := PRED(A)
+Definition take(x : BODY(x)) := unique(res : res != null && exists(x : res = BODY(x)))
+Definition let(A, x : BODY(x)) := BODY(A)
 
 Constant _is_sane(x)
 Notation _is_sane   _ is_sane   PRECEDENCE =
+Axiom is_sane_is_bool : (X is_sane) is_bool
 Axiom bool_is_sane : X is_bool => X is_sane
 Axiom null_is_not_sane : null !is_sane
 Axiom null_to_bool : to_bool(null) = false
