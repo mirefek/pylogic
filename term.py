@@ -70,7 +70,7 @@ class Term:
             self.args = tuple(args)
             self.debruin_height = 0
             if bound_names is None:
-                self.bound_names = [('?b',)*n for n in f.signature]
+                self.bound_names = tuple(('?b',)*n for n in f.signature)
             else: self.bound_names = bound_names
             for arg, numb in zip(args, f.signature):
                 assert isinstance(arg, Term)
@@ -85,6 +85,15 @@ class Term:
 
     def substitute_free(self, subst_d):
         return Substitution(subst_d).run(self)
+    def substitute_bvars(self, args, natural_order = True):
+        subst_env = Substitution(dict())
+        if natural_order:
+            if not isinstance(args, (list, tuple)): args = tuple(args)
+            subst_env.subst_l = [None]+list(reversed(args))
+        else:
+            subst_env.subst_l = list(args)
+        subst_env._cache_subst_bound = dict()
+        return subst_env._substitute_bound(self, 0)
 
     def equals_to(self, other, cache = None):
         if self == other: return True
@@ -129,6 +138,16 @@ class Term:
                 for bv in arg.bound_vars:
                     if bv > numb: self._bound_vars.add(bv - numb)
         return self._bound_vars
+
+    def get_ordered_free_vars(self, res = None):
+        if res is None:
+            res = []
+        if not self.free_vars.difference(res): return res
+        if self.f.is_free_variable and self.f not in res:
+            res.append(term.f)
+        for arg in args:
+            get_ordered_free_vars(res)
+        return res
 
     def to_str(self, bound_names = (), taken_names = None, **notation_kwargs):
         if taken_names is None:

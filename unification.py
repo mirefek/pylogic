@@ -30,11 +30,13 @@ class Unification:
         stack.reverse()
         postponed = []
         postponed_should_update = False
-        while stack or (postponed and postponed_should_update):
+        force_assign = False
+        while stack or (postponed and (postponed_should_update or not force_assign)):
             if not stack:
                 stack = postponed
                 self._encountered.difference_update(postponed)
                 postponed = []
+                if not postponed_should_update: force_assign = True
             x1,x2 = stack.pop()
             #print("unify", str(x1[0]),x1[1], str(x2[0]),x2[1])
             if (x1,x2) in self._encountered: continue
@@ -53,6 +55,14 @@ class Unification:
                 if t1.f == t2.f and side1 == side2 and t1.equals_to(t2):
                     continue
                 assign_result = self._assign(t1,side1, t2,side2)
+                if force_assign:
+                    if self._rename(t1,side1, t2,side2):
+                        stack.extend(
+                            ((st1, side1), (st2, side2))
+                            for st1, st2 in zip(reversed(t1.args), reversed(t2.args))
+                        )
+                    force_assign = False
+                    assign_result = True
                 if assign_result is None: # postpone
                     if not postponed:
                         postponed_should_update = False
@@ -69,9 +79,6 @@ class Unification:
                     for st1, st2 in zip(reversed(t1.args), reversed(t2.args))
                 )
 
-        to_be_equal = postponed
-        postponed = []
-        if not self._equality_check(to_be_equal): return False
         return True
 
     def export_substitutions(self, variables_per_side, new_var_generator = None):
@@ -217,14 +224,14 @@ class Unification:
                     break
                 else:
                     args[t1v] = Term(v1.arity-i)
-                    if t1v != args[t1v].debruin_height:
+                    if t1v != args[t1v].debruin_height-1:
                         arg_changed = True
             for tv2 in t2.bound_vars:
                 if args[tv2] is None: return False # missing variable
             if duplicite_variable: return None
 
             if not arg_changed: t2_abstract = t2
-            else: t2_abstract = self._substitute_bvars(t2, args)
+            else: t2_abstract = t2.substitute_bvars(args, natural_order = False)
 
         # set & check dependencies
         deps_rec = set()
@@ -240,6 +247,26 @@ class Unification:
         self._term_assignments[t1,side1] = t2,side2
         return True
 
+    def _rename(self, t1,side1, t2,side2):
+        if t1.f.arity != t2.f.arity: return False
+        v1 = t1.f
+        v1,side1v = self._var_copy_to_ori.get((v1,side1), (v1,side1))
+
+        # set & check dependencies
+        deps_rec = set()
+        for x in set(t2.free_vars):
+            x = self._var_copy_to_ori.get((x,side2), (x,side2))
+            deps_rec.add(x)
+            deps_rec.update(self._var_deps.get(x, ()))
+        if (v1,side1v) in deps_rec:
+            return False
+        self._var_deps[v1,side1v] = deps_rec
+
+        self._var_assignments[v1,side1v] = t2.f.to_term(),side2
+        self._term_assignments[t1,side1] = t2,side2
+        return True
+
+    
     def _get_assigned(self, x):
         x2 = self._get_assigned_step(x)
         if x2 is None: return x
@@ -270,11 +297,11 @@ class Unification:
             res_term = abstract_term
         else:
             assert term.f.arity > 0
-            args = [None]
+            args = []
             for i,arg in enumerate(term.args):
                 if i+1 not in abstract_term.bound_vars: args.append(None)
                 else: args.append(self._move_to_side(arg, side, res_side))
-            res_term = self._substitute_bvars(abstract_term, args)
+            res_term = abstract_term.substitute_bvars(args)
         self._term_assignments[x] = res_term, res_side
         return res_term, res_side
 
@@ -297,11 +324,6 @@ class Unification:
             ori_v : new_v.to_term()
             for ori_v, new_w in zip(ori_vars, new_vars)
         })
-    def _substitute_bvars(self, term, args):
-        subst_env = Substitution(dict())
-        subst_env.subst_l = args
-        subst_env._cache_subst_bound = dict()
-        return subst_env._substitute_bound(term, 0)
 
     def _should_swap(self, x1,x2):
         t1,side1 = x1
@@ -317,23 +339,7 @@ class Unification:
                 return len(t1.bound_vars) < len(t2.bound_vars)
         if t1.f.arity != t2.f.arity:
             return t1.f.arity > t2.f.arity
-        return side1 < side2
-
-    def _equality_check(self, to_check):
-        while to_check:
-            x1,x2 = to_check.pop()
-            if (x1,x2) in self._encountered: continue
-            x1 = self._get_assigned(x1)
-            x2 = self._get_assigned(x2)
-            if x1 == x2: continue
-            t1,side1 = x1
-            t2,side2 = x2
-            if t1.f != t2.f: return False
-            to_check.extend(
-                ((arg1, side1), (arg2, side2))
-                for arg1, arg2 in zip(t1.args, t2.args)
-            )
-        return True
+        return side1 > side2
 
 # TESTS
 
@@ -411,5 +417,15 @@ if __name__ == "__main__":
     test_unification(
         "PRED(X) => exists(x : PRED(x))",
         "!to_bool1(PRED2(Y)) => exists(x : !to_bool1(PRED2(x)))",
+        frozen = ((), None),
+    )
+    test_unification(
+        "PRED(X) => PRED2(X)",
+        "PRED(X) => PRED2(X)",
+        frozen = ((), ()),
+    )
+    test_unification(
+        "forall(x : forall(y : PRED(x, y))) => forall(y : PRED(X, y))",
+        "forall(x : forall(y : PRED(x, y))) => forall(y : PRED(X, y))",
         frozen = ((), None),
     )

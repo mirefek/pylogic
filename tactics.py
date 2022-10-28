@@ -141,6 +141,7 @@ def apply_spec(env, node, thm, num_subgoals = None):
     unification = Unification((thm.frozen_vars, None))
     unification.add_requirement(term,0, goal,1)
     if not unification.run():
+        unification.print_requirements()
         raise Exception(f"Apply: Unification failed: {thm.term} WITH {goal}")
     subst, _ = unification.export_substitutions(
         [thm.free_vars, goal.free_vars],

@@ -260,6 +260,35 @@ class Theorem:
                        self.frozen_vars | other.frozen_vars)
 
     #
+    #   More advanced operations
+    #
+
+    def alpha_equiv_exchange(self, term):
+        return self._env.basic_impl.refl(term).modus_ponens_basic(self)
+    
+    def generalize(self, *vs, fix_bnames = True):
+        vs = [
+            v if not isinstance(v, str) else self.get_var(v)
+            for v in vs
+        ]
+        if len(set(vs)) != len(vs):
+            raise Exception(f"Duplicite variable: {vs}")
+        res = self
+        correct_bnames = True
+        res_term = self.term.substitute_free({
+            v : Term(i)
+            for i,v in zip(range(len(vs),0,-1), vs)
+        })
+        for v in reversed(vs):
+            if isinstance(v, str): v = self.get_var(v)
+            res = self._env.generalize(res, v)
+            res_term = Term(self._env.constants.forall, (res_term,), ((v.name,),))
+            if v.name != res.term.bound_names[0][0]: correct_bnames = False
+        if not correct_bnames and fix_bnames:
+            res = res.alpha_equiv_exchange(res_term)
+        return res
+
+    #
     #    The complex Call method
     #
     #    * label renaming

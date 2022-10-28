@@ -92,6 +92,8 @@ class Rewriter:
         self._env.add_impl_rule("to_impl", self._eq_to_impl)
         self._env.add_impl_rule("symm", self._eq_symm)
 
+        self._extensionality = dict() # (var : TermFunction, parindex : int) -> Theorem
+
     def _build_rw_term(self, term, position):
         subterms = []
         for i in position:
@@ -103,6 +105,52 @@ class Rewriter:
             args[i] = res
             res = Term(term.f, args, term.bound_names)
         return res
+
+    def add_extensionality(self, theorem):
+        env = self._env
+
+        # check assumption, find BODY1, BODY2
+        
+        assump, main_eq = env.split_impl(theorem.term)
+        num_bound = 0
+        while assump.f == env.constants.forall:
+            [assump] = assump.args
+            num_bound += 1
+        BODY1_t, BODY2_t = env.split_eq(assump)
+        BODY1 = BODY1_t.f
+        BODY2 = BODY2_t.f
+        assert BODY1.arity == num_bound, (BODY1, BODY1.arity, num_bound)
+        assert BODY1.is_free_variable, BODY1
+        assert BODY2.is_free_variable, BODY2
+        assert BODY1_t.equals_to(BODY1.to_term()), (BODY1_t, BODY1.to_term())
+        assert BODY2_t.equals_to(BODY2.to_term()), BODY2_t
+
+        # check main_eq
+
+        a,b = env.split_eq(main_eq)
+        constant = a.f
+        assert not constant.is_free_variable, constant
+        assert constant == b.f, (constant, b.f)
+        vs = [x.f for x in a.args]
+        assert BODY1 in vs, (BODY1, a)
+        index = vs.index(BODY1)
+        assert all(
+            v.is_free_variable and v.arity == 0
+            for i,v in enumerate(vs)
+            if i != index
+        ), a
+        assert all(
+            v == xb.f
+            for i,(v,xb) in enumerate(zip(vs, b.args))
+            if i != index
+        ), (a,b)
+        assert a.args[index].equals_to(BODY1.to_term()), (a.args[index], BODY1)
+        assert b.args[index].equals_to(BODY2.to_term()), (b.args[index], BODY2)
+        vs_set = set(vs)
+        vs_set.add(BODY2)
+        assert len(vs_set) == len(vs)+1, vs+[BODY2]
+
+        self._extensionality[constant, index] = theorem, vs, BODY1, BODY2
 
     def raise_eq(self, eq, body_term, position = None):
         if position is not None:
@@ -156,11 +204,71 @@ class Rewriter:
         else:
             return RootRewriterList(rw_list)
 
+    def _run_on_arg(self, const, index, args, bound_names, rule, repeat):
+        arg = args[index]
+        local_vars = []
+        extensionality = self._extensionality.get((const,index), None)
+        if extensionality is not None:
+            local_vars = [
+                TermFunction((), True, name = name.upper())
+                for name in bound_names[index]
+            ]
+            arg = arg.substitute_bvars((
+                v.to_term() for v in local_vars
+            ))
+        arg, arg_eq_rwt = self._run_aux(arg, rule, repeat)
+        if arg_eq_rwt is None: return None
+        arg_eq, rwt = arg_eq_rwt
+        if extensionality is not None:
+            eq_vars = arg_eq.free_vars
+            if any(v in eq_vars for v in local_vars):
+                env = self._env
+                arg_eq = self.raise_eq(arg_eq, rwt)
+                ext_thm, ext_vs, BODY1, BODY2 = extensionality
+                subst = {
+                    v : arg
+                    for v, arg in zip(ext_vs, args)
+                }
+                arg_eq = arg_eq.generalize(*local_vars, fix_bnames = False)
+                t = arg_eq.term
+                for _ in range(BODY1.arity): t = t.args[0]
+                BODY1_term, BODY2_term = env.split_eq(t)
+                subst[BODY1] = BODY1_term
+                subst[BODY2] = BODY2_term
+                ext_thm_spec = ext_thm.specialize(subst)
+                arg_eq = ext_thm_spec.modus_ponens_basic(arg_eq)
+                arg_eq_lhs, arg_eq_rhs = env.split_eq(arg_eq.term)
+                bn1 = arg_eq_lhs.bound_names
+                bn2 = arg_eq_rhs.bound_names
+                if bn1 != bound_names or bn2 != bound_names:
+                    bnames_correction = Term(
+                        env.core.equality, (
+                            Term(const, arg_eq_lhs.args, bound_names),
+                            Term(const, arg_eq_rhs.args, bound_names),
+                        )
+                    )
+                    arg_eq = arg_eq.alpha_equiv_exchange(bnames_correction)
+                rwt = Term(1)
+                arg = arg_eq.term.args[1].args[index]
+            else:
+                subst = dict(zip(
+                    local_vars,
+                    range(len(local_vars), 0, -1)
+                ))
+                rwt = rwt.substitute_free(subst)
+                arg = arg.substitute_free(subst)
+        else:
+            args[index] = rwt
+            rwt = Term(const, args, bound_names)
+        args[index] = arg
+        return arg_eq, rwt
+
     def _run_aux(self, term, rule, repeat): # return term, (None | (eq, rw_term))
         res = None
         root_changed = True
         while True:
             while True: # try to rewrite root
+                if term.debruin_height > 0: break
                 root_rule = rule.try_rw(term)
                 if root_rule is None: break
                 term = root_rule.term.args[1]
@@ -172,13 +280,9 @@ class Rewriter:
             args_changed = False
             args = list(term.args)
             for i,arg in enumerate(args):
-                arg, arg_eq = self._run_aux(arg, rule, repeat)
-                if arg_eq is None: continue
-                eq, rwt = arg_eq
-                args[i] = rwt
-                rwt = Term(term.f, args, term.bound_names)
-                res = self._combine_output(res, eq, rwt)
-                args[i] = arg
+                arg_res = self._run_on_arg(term.f, i, args, term.bound_names, rule, repeat)
+                if arg_res is None: continue
+                res = self._combine_output(res, *arg_res)
                 args_changed = True
                 if not repeat: break
             if not args_changed: break

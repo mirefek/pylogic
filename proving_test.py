@@ -1,6 +1,6 @@
 from logic_env import LogicEnv
 from tactics import apply_spec, Intros, PatternLookupGoal, ApplyExact
-from term import Term
+from term import Term, TermFunction, get_unused_name
 from pytheorem import Theorem
 from pattern_lookup import PatternLookupRewrite
 
@@ -455,9 +455,14 @@ print(forall_intro)
 
 x = forall_elim(PRED = "x : BODY1(x) = BODY2(x)").rw(to_bool1_idemp)
 with g.goal(x.term):
-    g.app(x(typing = 0), 1)
+    g.app_exact(x(typing = 0), 1)
     g.typing()
 forall_eq_elim = g.last_proven # x(typing = g.last_proven)
+x = forall_elim(PRED = "x : forall(y : PRED(x,y))").rw(to_bool1_idemp)
+with g.goal(x.term):
+    g.app_exact(x(typing = 0), 1)
+    g.typing()
+forall_forall_elim = g.last_proven # x(typing = g.last_proven)
 
 def generalize(thm, v):
     if isinstance(v, str):
@@ -472,7 +477,7 @@ def generalize(thm, v):
     x = x.modus_ponens_basic(thm)
     return x
 
-print(generalize(axiom.dummy_assump, 'X'))
+env.generalize = generalize
 
 with g.goal("forall(x : PRED(x) = PRED2(x)) => example(x : PRED(x)) = example(x : PRED2(x))"):
     assump = g.intro()
@@ -482,7 +487,6 @@ with g.goal("forall(x : PRED(x) = PRED2(x)) => example(x : PRED(x)) = example(x 
         g.app(axiom.example_well_founded)
         with g.goal("PRED(X) => PRED2(X)"):
             print(g.current_goal)
-            #g.app(forall_eq_elim(assump).to_impl()) TODO: why failed?
             g.exact(assump_eq.to_impl())
         g.exact(generalize(g.last_proven, 'X'))
         g.exact(ex)
@@ -493,14 +497,80 @@ with g.goal("forall(x : PRED(x) = PRED2(x)) => example(x : PRED(x)) = example(x 
             axiom.example_universal(
                 PRED = "x : PRED2(x)",
                 X = "example(x : PRED(x))"
-            ).exchange_frozen(set([nex.get_var("PRED"), nex.get_var("PRED2")])),
+            ),
             nex2,
         ).rw(assump_eq.symm)
 
-        g.rw(axiom.example_null(nex1, PRED = "x : PRED(x)"))
-        g.exact(axiom.example_null(nex2, PRED = "x : PRED2(x)").symm)
+        g.rw(axiom.example_null(nex1))
+        g.exact(axiom.example_null(nex2).symm)
 
 example_ext = g.last_proven
+env.rewriter.add_extensionality(example_ext)
 
-print("EXAMPLE EXT:")
-print(example_ext)
+#x = or_intro1.generalize('A', 'B')
+x = axiom.eq_refl(X = "example(X : ((X && Y) || Y) && Z)")
+print(x)
+x = x.rw(co._or)
+print(x)
+
+def prove_extensionality_by_definition(constant, index = None):
+    if index is None:
+        for index, numb in enumerate(constant.signature):
+            if numb > 0: prove_extensionality_by_definition(constant, index)
+        return
+
+    numb = constant.signature[index]
+    assert numb > 0
+    PRED = env.parser.get_var("PRED", 1)
+    X = env.parser.get_var("X", 0)
+    BODY1 = env.parser.get_var("BODY1", numb)
+    BODY2 = env.parser.get_var("BODY2", numb)
+    used_names = set()
+    bound_names_common = []
+    for _ in range(max(constant.signature)):
+        name = get_unused_name('x', used_names)
+        bound_names_common.append(name)
+        used_names.add(name)
+    bound_names_common = tuple(bound_names_common)
+    bound_names = tuple(
+        bound_names_common[:numb2]
+        for numb2 in constant.signature
+    )
+    bound_names_main = bound_names[index]
+    used_names = set()
+    vs = []
+    for i2,numb2 in enumerate(constant.signature):
+        if i2 == index: vs.append(BODY1)
+        else:
+            v = env.get_locally_fresh_var(
+                TermFunction((0,)*numb2, True, "A"),
+                used_names,
+            )
+            used_names = v.name
+            vs.append(v)
+    args1 = [v.to_term() for v in vs]
+    args2 = list(args1)
+    args2[index] = BODY2.to_term()
+    assump = Term(env.core.equality, (args1[index], args2[index]))
+    for bname in reversed(bound_names_main):
+        assump = Term(co.forall, (assump,), bound_names = ((bname,),))
+    lhs = Term(constant, args1, bound_names = bound_names)
+    rhs = Term(constant, args2, bound_names = bound_names)
+    main_eq = Term(env.core.equality, (lhs, rhs))
+    ext_goal = Term(env.core.implication, (assump, main_eq))
+    with g.goal(ext_goal):
+        a = g.intro()
+        g.rw(constant, position=[0]).rw(constant, position=[1])
+        for _ in range(numb-1): a = forall_forall_elim(a)
+        a = forall_eq_elim(a)
+        g.rw(a, position = [0], repeat = True)
+        g.app(axiom.eq_refl)
+    env.rewriter.add_extensionality(g.last_proven)
+    print(g.last_proven)
+
+prove_extensionality_by_definition(co.exists)
+prove_extensionality_by_definition(co.forall)
+prove_extensionality_by_definition(co.exists_uq)
+prove_extensionality_by_definition(co.unique)
+prove_extensionality_by_definition(co.take)
+prove_extensionality_by_definition(co.let)
