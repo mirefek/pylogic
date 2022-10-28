@@ -10,11 +10,12 @@ Axiom only_apply_func : f is_Fun || f[X] = null
 Axiom apply_sane_or_null : f[X] is_sane || f[X] = null
 
 Constant fun(x : BODY(x))
-Axiom def_apply_fun : fun(x : BODY(x))[A] = require A is_sane; require BODY(A) is_sane; BODY(A)
+Definition req_sane(X) := require X is_sane; X
+Axiom def_apply_fun : fun(x : BODY(x))[A] = require A is_sane; req_sane(BODY(A))
 Axiom fun_ext : forall(x : BODY1(x) = BODY2(x)) => fun(x : BODY(x)) = fun(x : BODY(x))
 Axiom fun_repr : is_Fun f => fun(x : f[x]) = f
 
-# definitions around functions
+# definitions about functions
 
 Definition funcs := set(f : f is_Fun)   # the class of all sane functions
 Definition domain(f) := require f is_Fun; set(x : f[x] != null)
