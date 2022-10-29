@@ -1,0 +1,54 @@
+# basic concepts
+
+Constant _is_Set(X)
+Notation _is_Set   _ is_Set   PRECEDENCE =
+Axiom is_Set_is_bool : (X is_Set) is_bool
+
+Constant _in(X,Y)
+Notation _in      _ in _   PRECEDENCE =
+Axiom in_is_bool : (x in A) is_bool
+Axiom only_in_set : x in A => A is_Set
+
+Constant set(x : PRED(x))
+Axiom set_is_set : set(x : PRED(x)) is_set
+Axiom def_in_set : A in set(x : PRED(x)) <=> A is_sane && PRED(X)
+Axiom set_ext : forall(x : PRED1(x) = PRED2(x)) => set(x : PRED1(x)) = set(x : PRED2(x))
+Axiom set_repr : is_Set A => set(x : x in A) = A
+
+# simple sets
+
+Definition bools := set(x : x is_bool)
+Definition sets := set(x : x is_Set)     # class of all the sets
+Definitions universe := set(x : true)
+
+# set constructions
+
+Definition _subset_eq(A,B) := forall(x : x in A => x in B)
+Notation _subset_eq      _ <:= _   PRECEDENCE =
+Definition _supset_eq(A,B) := B <:= A
+Notation _supset_eq      _ :>= _   PRECEDENCE =
+Definition _subset(A,B) := A <:= B && A != B
+Notation _subset       _ :< _   PRECEDENCE =
+Definition _supset(A,B) := B <: A
+Notation _supset       _ :> _   PRECEDENCE =
+
+Definition _union(A,B) := require A is_Set; require B is_Set; set(x : x in A || x in B)
+Definition _intersect(A,B) := require A is_Set; require B is_Set; set(x : x in A && x in B)
+Notation   _union        _ | _      INSIDE ! ASSOCRIGHT
+Notation   _intersect    _ & _      INSIDE ! OUTSIDE ( ASSOCRIGHT
+Definition Union(A) := require A is_Set; set(x : exists(y : require y in A; x in y ))
+Definition Intersect(A) := require A is_Set; set(x : forall(y : require y in A; x in y ))
+Definition powerset(A) := require A is_Set; set(x : x <:= A)
+Definition unique(A) := require A is_Set; unique(x : x in A)
+
+Definition map_set(x : BODY(x), A) := require A is_Set; set(y : exists(x : require x in A; y = BODY(x)))
+Definition _empty_set := set(x : false)
+Notation _empty_set       {}
+
+# set-theoretical axioms
+
+Axiom bools_sane : bools is_sane  # an alternative to the existence axiom
+Axiom powerset :    A in sets => powerset(A) in sets
+Axiom union :       A in sets => Union(A) in sets
+Axiom replacement : A in sets => map_set(x : BODY(x), A) in sets
+Axiom regularity :  A is_Set => A != {} => exists(x : require x in A; x & A = {})
