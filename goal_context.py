@@ -69,10 +69,10 @@ class GoalEnv:
     def subgoal(self, goal_term = None, unfreeze = True):
         cur, _ = self._current_goal()
         if goal_term is None:
-            goal_term = cur
+            goal_term = cur.term
         else:
             goal_term = self.env.to_term(goal_term)
-        if not goal_term.term.equals_to(cur.term):
+        if not goal_term.equals_to(cur.term):
             print("Current", cur)
             print("Claimed ", goal_term)
             raise Exception("Subgoal does not match the current goal")

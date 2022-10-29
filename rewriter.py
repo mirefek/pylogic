@@ -61,7 +61,7 @@ class RootRewriterUnfold(RootRewriter):
     def __init__(self, env, consts):
         self.env = env
         self.c_to_def = {
-            c : self.env.definitions.get(c, None)
+            c : self.env.defs[c]
             for c in consts
         }
         assert None not in self.c_to_def.values()
@@ -186,7 +186,7 @@ class Rewriter:
             elif isinstance(arg, Theorem):
                 cur_rw = RootRewriterSingle(arg)
             elif isinstance(arg, (tuple, list)):
-                cur_rw = self.to_root_rewriter(*args)
+                cur_rw = self.to_root_rewriter(*arg)
             elif isinstance(arg, TermFunction):
                 consts.append(arg)
                 cur_rw = None

@@ -1,11 +1,36 @@
-from logic_core import AssumptionLabel
+from logic_core import AssumptionLabel, CoreTheorem
 from term import Term, TermFunction, compose_substitutions, next_names
 from unification import Unification
+
+class Resolver:
+    def run(self, label, core_thm): # returns resolved theorem, or a copy of itself
+        raise Exception("Not implemented")
+    @classmethod
+    def resolve_with(self, label, core_thm, proven_label):
+        core_thm = core_thm.labels_to_impl(label)
+        if isinstance(proven_label, Theorem):
+            proven_label = proven_label.core_thm
+        core_thm = core_thm.modus_ponens(proven_label)
+        return core_thm
 
 # Class for handling theorems in a coder-friendly way
 
 class Theorem:
-    def __init__(self, env, core_thm, frozen_vars = ()):
+    def __init__(self, env, core_thm, frozen_vars = (), resolvers = ()):
+
+        resolvers = list(resolvers)
+        self.resolvers = []
+        while resolvers:
+            resolver, label = resolvers.pop()
+            out = resolver.run(label, core_thm)
+            if isinstance(out, CoreTheorem):
+                core_thm = out
+                resolvers.extend(self.resolvers)
+                self.resolvers = []
+            else:
+                assert isinstance(out, Resolver), out
+                self.resolvers.append((out, label))
+
         self.core_thm = core_thm
         self.frozen_vars = frozenset(frozen_vars)
 
@@ -52,9 +77,31 @@ class Theorem:
     def __str__(self): return self.to_str()
 
     def exchange_frozen(self, frozen_vars):
-        return Theorem(self._env, self.core_thm, frozen_vars)
-    def unfreeze(self):
-        return Theorem(self._env, self.core_thm)
+        return Theorem(self._env, self.core_thm, frozen_vars, resolvers = self.resolvers)
+    def unfreeze(self, vs = None):
+        if vs is None:
+            return self.exchange_frozen(())
+        else:
+            if isinstance(vs, (str, TermFunction)):
+                vs = [vs]
+            for v in vs:
+                vs = [
+                    v if not isinstance(v, str) else self.get_var(v)
+                    for v in vs
+                ]
+                assert None not in vs
+            return self.exchange_frozen(self.frozen_vars.difference(vs))
+    def freeze(self, vs = None):
+        if vs is None: vs = self.free_vars
+        else:
+            if isinstance(vs, (str, TermFunction)):
+                vs = [vs]
+            vs = [
+                v if not isinstance(v, str) else self.get_var(v)
+                for v in vs
+            ]
+            assert None not in vs
+        return self.exchange_frozen(self.frozen_vars.union(vs))
 
     #
     #     Applying rules
@@ -144,7 +191,7 @@ class Theorem:
             core_thm = core_thm.specialize(var_subst)
         elif frozen_vars == self.frozen_vars: return self
 
-        return Theorem(self._env, core_thm, frozen_vars)
+        return Theorem(self._env, core_thm, frozen_vars, resolvers = self.resolvers)
 
     def relabel(self, relabeling):
         if not relabeling: return self
@@ -176,7 +223,15 @@ class Theorem:
             res_thm = res_thm.specialize(subst)
         res_thm = res_thm.relabel(relabeling)
 
-        return Theorem(self._env, res_thm, self.frozen_vars)
+        if not self.resolvers: resolvers = []
+        else:
+            resolvers_d = dict(
+                (relabeling.get(label, label), resolver)
+                for resolver, label in self.resolvers
+            )
+            resolvers = [(resolver, label) for label, resolver in resolver_d.items()]
+
+        return Theorem(self._env, res_thm, self.frozen_vars, resolvers = resolvers)
 
     def labels_to_impl(self, *labels):
         if len(labels) == 1 and isinstance(labels[0], (list, tuple)):
@@ -184,14 +239,19 @@ class Theorem:
         if not labels: return self
         labels = [self._env.to_label(label) for label in labels]
         core_thm = self.core_thm.labels_to_impl(*labels)
-        return Theorem(self._env, core_thm, self.frozen_vars)
+        resolvers = [
+            (resolver, label)
+            for resolver, label in self.resolvers
+            if label not in labels
+        ]
+        return Theorem(self._env, core_thm, self.frozen_vars, resolvers = resolvers)
 
     def impl_to_labels_basic(self, *labels):
         if len(labels) == 1 and isinstance(labels[0], (list, tuple)):
             [labels] = labels
         if not labels: return self
         core_thm = self.core_thm.impl_to_labels(*labels)
-        return Theorem(self._env, core_thm, self.frozen_vars)
+        return Theorem(self._env, core_thm, self.frozen_vars, resolvers = self.resolvers)
         
     def impl_to_labels(self, *labels):
         if len(labels) == 1 and isinstance(labels[0], (list, tuple)):
@@ -256,8 +316,34 @@ class Theorem:
                 if renaming2: other_thm = other_thm.relabel(renaming2)
 
         core_thm = self.core_thm.modus_ponens(other_thm)
+        if not self.resolvers:
+            resolvers = other.resolvers
+        elif not other.resolvers:
+            resolvers = self.resolvers
+        else:
+            resolvers_d = { l : r for r,l in self.resolvers }
+            resolvers_d.update((l,r) for r,l in other.resolvers)
+            resolvers = [(r,l) for l,r in resolvers_d.items()]
+
         return Theorem(self._env, core_thm,
-                       self.frozen_vars | other.frozen_vars)
+                       self.frozen_vars | other.frozen_vars,
+                       resolvers)
+
+    def set_resolver(self, resolver, label = "_AUTO_"):
+        label = self._env.to_label(label)
+        resolvers = list(self.resolvers)
+        core_thm = self.core_thm
+        if label in self.assump_labels():
+            for i,(r,l) in enumerate(self.resolvers):
+                if l == label:
+                    resolvers[i] = resolver, label
+                    break
+            else:
+                resolvers.append((resolver, label))
+        else:
+            core_thm = core_thm.impl_to_labels(label)
+            resolvers.append((resolver, label))
+        return Theorem(self._env, core_thm, self.frozen_vars, resolvers)
 
     #
     #   More advanced operations
@@ -341,7 +427,7 @@ class Theorem:
                     raise Exception(f"Unexpected keyword arguments: {name}")
 
         # (1) assure output positions are complete
-        
+
         for arg in args:
             if isinstance(arg, int):
                 assert arg >= 0

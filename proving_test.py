@@ -1,7 +1,8 @@
 from logic_env import LogicEnv
-from tactics import apply_spec, Intros, PatternLookupGoal, ApplyExact
+from tactics import apply_spec, Intros, PatternLookupGoal, ApplyExact, BasicTactic
 from term import Term, TermFunction, get_unused_name
-from pytheorem import Theorem
+from logic_core import AssumptionLabel
+from pytheorem import Theorem, Resolver
 from pattern_lookup import PatternLookupRewrite
 
 env = LogicEnv()
@@ -30,8 +31,8 @@ with g.goal("!X => X => false"):
 contr = g.last_proven
 print(contr)
 
-by_contradiction = axiom.double_neg.rw(co._neg, position=[0])
-print("by contradiction", by_contradiction)
+env.tactics.register("by_contradiction", axiom.double_neg.rw(co._neg, position=[0]))
+env.tactics.register("by_contradiction", env.defs._neg.symm.to_impl())
 
 with g.goal("(!X => X) => X"):
     a = g.intros()
@@ -43,10 +44,10 @@ print("assump_neg:", assump_neg)
 
 with g.goal("(A => X) => (!A => X) => X"):
     ax, nax = g.intros()
-    g.app(by_contradiction)
+    g.by_contradiction()
     nx = g.intro().rw(co._neg)
     na = chain(ax,nx)
-    na = na.rw(env.definitions[co._neg].symm())
+    na = na.rw(env.defs._neg.symm)
     g.exact(nx(nax(na)))
 
 cases_bool = g.last_proven
@@ -96,7 +97,7 @@ env.tactics.register("choose", choose)
 with g.goal("A && B => A"):
     g.rw(co._and).rw(co._neg)
     assump = g.intro()
-    na = g.app(by_contradiction).intro()
+    na = g.by_contradiction().intro()
     g.app(assump)
     g.choose0().assumed()
 
@@ -106,7 +107,7 @@ print("split_and1:", split_and1)
 with g.goal("A && B => B"):
     g.rw(co._and).rw(co._neg)
     assump = g.intro()
-    nb = g.app(by_contradiction).intro()
+    nb = g.by_contradiction().intro()
     g.app(assump)
     g.choose1().exact(nb)
 
@@ -120,9 +121,9 @@ with g.goal("A => B => A && B"):
     g.exact(contr(0,a))
     g.exact(contr(0,b))
 
-cases_and = g.last_proven
-print("cases_and:", cases_and)
-env.tactics.register("cases_goal", cases_and)
+and_intro = g.last_proven
+print("and_intro:", and_intro)
+env.tactics.register("cases_goal", and_intro)
 
 env.add_impl_rule("split", split_and1, split_and2)
 
@@ -156,8 +157,8 @@ def cases_tactic(env, node, *args):
 env.tactics.register("cases", cases_tactic)
 
 x = env.basic_impl.refl(env.to_term("false"))
-thm_not_false = x.rw(env.definitions[co._neg].symm)
-thm_true = thm_not_false.rw(env.definitions[co.true].symm)
+thm_not_false = x.rw(env.defs._neg.symm)
+thm_true = thm_not_false.rw(env.defs.true.symm)
 
 with g.goal("X is_bool => Y is_bool => (X => Y) => (Y => X) => X = Y"):
     x_bool, y_bool, xy, yx = g.intros()
@@ -173,10 +174,34 @@ with g.goal("X is_bool => Y is_bool => (X => Y) => (Y => X) => X = Y"):
     yt = g.app(g.last_proven(xt,yf,xy))
     g.rw(xt).rw(yt).app(axiom.eq_refl)
 
-bool_eq_by_equiv = g.last_proven
+
+class TypingResolver(Resolver):
+    def __init__(self, env, last_check = None):
+        self.env = env
+        self.last_check = last_check
+    def run(self, label, core_thm):
+        cur_check = core_thm.assumption(label)
+        if self.last_check is not None:
+            if cur_check is self.last_check: return self
+            if cur_check.equals_to(self.last_check):
+                return TypingResolver(self.env, cur_check)
+        typing_tactic = self.env.tactics.get_tactic("typing")
+        thm_n = typing_tactic.find_first(cur_check)
+        if thm_n is None:
+            return TypingResolver(self.env, cur_check)
+        thm, n = thm_n
+        if n > 0 or thm.has_assumptions:
+            return TypingResolver(self.env, cur_check)
+        return self.resolve_with(label, core_thm, thm.core_thm)
 
 env.tactics.register("typing", axiom.eq_is_bool)
 env.tactics.register("typing", axiom.impl_is_bool)
+env.tactics.register("typing", axiom.is_sane_is_bool)
+
+bool_eq_by_equiv = g.last_proven
+bool_eq_by_equiv = bool_eq_by_equiv.set_resolver(TypingResolver(env), "typing1")
+bool_eq_by_equiv = bool_eq_by_equiv.set_resolver(TypingResolver(env), "typing2")
+
 with g.goal("false is_bool"):
     g.rw(co._is_bool)
     g.choose0().app(axiom.eq_refl)
@@ -185,7 +210,7 @@ env.tactics.register("typing", g.last_proven)
 def prove_basic_typing(term):
     with g.goal(term):
         c = g.current_goal.term.args[0].f
-        g.rw(c)
+        g.rw(c, position = [0])
         g.typing()
     env.tactics.register("typing", g.last_proven)
 
@@ -195,29 +220,25 @@ prove_basic_typing("(X || Y) is_bool")
 prove_basic_typing("(X && Y) is_bool")
 prove_basic_typing("(X ^^ Y) is_bool")
 prove_basic_typing("(X <=> Y) is_bool")
+prove_basic_typing("(X is_bool) is_bool")
 prove_basic_typing("to_bool(X) is_bool")
 prove_basic_typing("to_bool1(X) is_bool")
 prove_basic_typing("exists(x : PRED(x)) is_bool")
 prove_basic_typing("forall(x : PRED(x)) is_bool")
 
-strip_to_bool = axiom.double_neg.rw(env.definitions[co.to_bool].symm)
-intro_to_bool = dneg_rev.rw(env.definitions[co.to_bool].symm)
+to_bool_elim = axiom.double_neg.rw(env.defs.to_bool.symm)
+to_bool_intro = dneg_rev.rw(env.defs.to_bool.symm)
 
-with g.goal("X is_bool => to_bool(X) = X"):
-    g.intro()
+with g.goal("to_bool(X) = X"):
     g.app(bool_eq_by_equiv)
-    g.typing()   # to_bool(X) is_bool
-    g.assumed()  # X is_bool
-    g.exact(strip_to_bool)  # to_bool(X) => X
-    g.exact(intro_to_bool)    # X => to_bool(X)
+    g.exact(to_bool_elim)  # to_bool(X) => X
+    g.exact(to_bool_intro)    # X => to_bool(X)
 
 is_bool_to_bool_eq = g.last_proven
 
-with g.goal("X is_bool => X => X = true"):
-    xb, x = g.intros()
+with g.goal("X => X = true"):
+    x = g.intro()
     g.app(bool_eq_by_equiv)
-    g.exact(xb)  # X is_bool
-    g.typing()   # true is_bool
     g.intro()    # X => true
     g.app(thm_true)
     g.intro()    # true => X
@@ -225,11 +246,9 @@ with g.goal("X is_bool => X => X = true"):
 
 to_eq_true = g.last_proven
 
-with g.goal("X is_bool => !X => X = false"):
-    xb, nx = g.intros()
+with g.goal("!X => X = false"):
+    nx = g.intro()
     g.app(bool_eq_by_equiv)
-    g.exact(xb)           # to_bool(X) is_bool
-    g.typing()            # false is_bool
     x = g.intro()         # to_bool(X) => false
     g.exact( contr(nx, x) )
     g.app(axiom.false,0)   # false => to_bool(X)
@@ -243,9 +262,7 @@ def to_eq(thm):
         term = term.args[0]
     else:
         rule = to_eq_true
-    with g.goal(Term(co._is_bool, (term,))):
-        g.typing()
-    return rule(g.last_proven, thm)
+    return rule(thm)
 
 autoconvert = dict()
 autoconvert["reduce"] = PatternLookupRewrite()
@@ -254,26 +271,26 @@ def add_autoconvert(thm, c, i):
     autoconvert["reduce"] = autoconvert["reduce"].add_rule(thm.symm)
 
 with g.goal("(A => B) = (A => to_bool(B))"):
-    g.app(bool_eq_by_equiv).typing().typing()
+    g.app(bool_eq_by_equiv)
     ab,a = g.intros()
-    g.exact(intro_to_bool(ab(a)))
+    g.exact(to_bool_intro(ab(a)))
     abb,a = g.intros()
-    g.exact(strip_to_bool(abb(a)))
+    g.exact(to_bool_elim(abb(a)))
 
 add_autoconvert(g.last_proven, co._impl, 1)
 
 with g.goal("(A => B) = (to_bool(A) => B)"):
-    g.app(bool_eq_by_equiv).typing().typing()
+    g.app(bool_eq_by_equiv)
     ab,aa = g.intros()
-    g.exact(ab(strip_to_bool(aa)))
+    g.exact(ab(to_bool_elim(aa)))
     aab,a = g.intros()
-    g.exact(aab(intro_to_bool(a)))
+    g.exact(aab(to_bool_intro(a)))
 
 add_autoconvert(g.last_proven, co._impl, 0)
 
 def prove_autoconvert_by_definition(constant, *ii):
     for i in ii:
-        c_def = env.definitions[constant]
+        c_def = env.defs[constant]
         header, _ = env.split_eq(c_def.term)
         args = list(header.args)
         args[i] = Term(co.to_bool, (args[i],))
@@ -297,7 +314,7 @@ with g.goal("(if C ; X else Y) = (if to_bool(C) ; X else Y)"):
     c = g.cases("C")
     with g.subgoal():
         g.rw(axiom.if_true(c))
-        g.rw(axiom.if_true(intro_to_bool(c)))
+        g.rw(axiom.if_true(to_bool_intro(c)))
         g.app(axiom.eq_refl)
     nc = g.get_last_output()
     g.rw(axiom.if_false(nc))
@@ -323,14 +340,14 @@ with g.goal("PRED(X) => exists(x : PRED(x))"):
     g.exact(axiom.example_universal)
 
 exists_intro = g.last_proven
-exists_elim = env.definitions[co.exists].to_impl().rw(autoconvert["reduce"])
+exists_elim = env.defs.exists.to_impl().rw(autoconvert["reduce"])
 
 print(exists_intro) # PRED(X) => exists(x : PRED(x))
 print(exists_elim)  # exists(x : PRED(x)) => PRED(example(x : PRED(x)))
 eq_symm = env.rewriter._eq_symm
 
 with g.goal("(X = Y) = (Y = X)"):
-    g.app(bool_eq_by_equiv).typing().typing()
+    g.app(bool_eq_by_equiv)
     g.app(eq_symm,0).app(eq_symm,0)
 
 eq_symm_rw = g.last_proven
@@ -350,18 +367,17 @@ def add_bool_calc(rule):
     bool_calc = bool_calc.add_rule(rule)
 
 with g.goal("(X => true) = true"):
-    g.app(bool_eq_by_equiv).typing().typing()
+    g.app(bool_eq_by_equiv)
     g.intro()
     g.exact(thm_true)
     g.intros()
     g.exact(thm_true)
 
 add_bool_calc(g.last_proven)
-add_bool_calc(env.definitions[co._neg].symm) # (X => false) = !X
+add_bool_calc(env.defs._neg.symm) # (X => false) = !X
 
 with g.goal("(true => X) = X"):
-    g.app(bool_eq_by_equiv).typing()
-    g.postpone("typing")
+    g.app(bool_eq_by_equiv)
     tx = g.intro()
     g.exact(tx(thm_true))
     x,_ = g.intros()
@@ -370,18 +386,17 @@ with g.goal("(true => X) = X"):
 add_bool_calc(g.last_proven)
 
 with g.goal("(false => X) = true"):
-    g.app(bool_eq_by_equiv).typing().typing()
+    g.app(bool_eq_by_equiv)
     g.intros()
     g.exact(thm_true)
     g.intro()
     g.app(axiom.false,0)
 
 add_bool_calc(g.last_proven)
-add_bool_calc(env.definitions[co.true].symm)
+add_bool_calc(env.defs.true.symm)
 
 with g.goal("!!X = X"):
-    g.app(bool_eq_by_equiv).typing()
-    g.postpone("typing")
+    g.app(bool_eq_by_equiv)
     g.exact(axiom.double_neg).exact(dneg_rev)
 
 double_neg_eq = g.last_proven
@@ -406,11 +421,9 @@ prove_bool_calc("(X || false) = X")
 
 with g.goal("to_bool1(X) = X"):
     g.rw(co.to_bool1)
-    x_bool = env.hypothesis("typing", "X is_bool")
-    x_sane = axiom.bool_is_sane(x_bool)
+    x_sane = axiom.bool_is_sane.set_resolver(TypingResolver(env), "typing2")
     xnn = neq_by_pred(PRED = "x : x is_sane")(x_sane, axiom.null_is_not_sane)
     g.rw(to_eq(xnn)).rw(bool_calc).app(axiom.eq_refl)
-
     root = g.current_ctx.tree.root
 
 print(g.last_proven)
@@ -418,31 +431,55 @@ to_bool1_idemp = g.last_proven
 
 with g.goal("(!A => B) => (!B => A)"):
     nab,nb = g.intros()
-    na = g.app(by_contradiction).intro()
+    na = g.by_contradiction().intro()
     g.exact(contr(nb, nab(na)))
 
 nimpl_symm = g.last_proven
 x = nimpl_symm(B = "!B")
-x = x.rw(env.definitions[co.to_bool].symm)
+x = x.rw(env.defs.to_bool.symm)
 x = x.rw(autoconvert["reduce"])
 contraposition = x
 x = x(A = "!A")
-x = x.rw(env.definitions[co.to_bool].symm)
+x = x.rw(env.defs.to_bool.symm)
 x = x.rw(autoconvert["reduce"])
 impln_symm = x
 x = x(B = "!B")
-x = x.rw(env.definitions[co.to_bool].symm)
+x = x.rw(env.defs.to_bool.symm)
 x = x.rw(autoconvert["reduce"])
 contraposition_rev = x
 
+null_to_false = chain(to_bool_intro, axiom.null_to_bool.to_impl())
+null_to_any = chain(null_to_false, axiom.false)
+req_true = axiom.if_true(B = "null").rw(env.defs._require.symm)
+req_false = axiom.if_false(B = "null").rw(env.defs._require.symm)
+
+with g.goal("(require A; B) => A"):
+    req = g.intro()
+    na = g.by_contradiction().intro()
+    g.exact(null_to_false(req.rw(req_false(na))))
+split_req1 = g.last_proven
+
+with g.goal("(require A; B) => B"):
+    req = g.intro()
+    a = g.cases("A")
+    g.exact(req.rw(req_true(a)))
+    na = g.get_last_output()
+    g.app(null_to_any)
+    g.exact(req.rw(req_false(na)))
+split_req2 = g.last_proven
+
+print(split_req1)
+print(split_req2)
+env.add_impl_rule("split", split_req1, split_req2)
+
 x = exists_intro(PRED = "x : !to_bool1(PRED(x))")
 x = nimpl_symm(x)
-x = x.rw(env.definitions[co.forall].symm)
-forall_elim = x
+x = x.rw(env.defs.forall.symm)
+forall_elim_full = x
 
 x = exists_elim(PRED = "x : !to_bool1(PRED(x))")
 x = impln_symm(x)
-x = x.rw(env.definitions[co.forall].symm)
+x = x.rw(env.defs.forall.symm)
 forall_intro_full = x
 
 with g.goal("X => to_bool1(X)"):
@@ -453,16 +490,9 @@ to_bool1_intro = g.last_proven
 forall_intro = chain(to_bool1_intro, forall_intro_full)
 print(forall_intro)
 
-x = forall_elim(PRED = "x : BODY1(x) = BODY2(x)").rw(to_bool1_idemp)
-with g.goal(x.term):
-    g.app_exact(x(typing = 0), 1)
-    g.typing()
-forall_eq_elim = g.last_proven # x(typing = g.last_proven)
-x = forall_elim(PRED = "x : forall(y : PRED(x,y))").rw(to_bool1_idemp)
-with g.goal(x.term):
-    g.app_exact(x(typing = 0), 1)
-    g.typing()
-forall_forall_elim = g.last_proven # x(typing = g.last_proven)
+forall_elim = forall_elim_full.rw(to_bool1_idemp)
+forall_eq_elim = forall_elim(PRED = "x : BODY1(x) = BODY2(x)")
+forall_forall_elim = forall_elim(PRED = "x : forall(y : PRED(x,y))")
 
 def generalize(thm, v):
     if isinstance(v, str):
@@ -574,3 +604,169 @@ prove_extensionality_by_definition(co.exists_uq)
 prove_extensionality_by_definition(co.unique)
 prove_extensionality_by_definition(co.take)
 prove_extensionality_by_definition(co.let)
+
+class SubstResolver(Resolver):
+    def __init__(self, env, last_check_fail = None):
+        self.env = env
+        self.last_check_fail = last_check_fail
+    def run(self, label, core_thm):
+        aterm = core_thm.assumption(label)
+        v = aterm.args[0].f
+        if self.last_check_fail is not None and self.last_check_fail is not label:
+            if self.last_check_fail is True: return self
+            aterm2 = core_thm.assumption(self.last_check_fail)
+            if aterm2 is not None and v in aterm2.free_vars:
+                return self
+        if v in core_thm.term.free_vars: return self
+        for label2, aterm2 in core_thm.assump_items():
+            if label2 == label:
+                if v in aterm2.args[1].free_vars:
+                    return SubstResolver(self.env, True)
+            elif v in aterm2.free_vars:
+                return SubstResolver(self.env, label2)
+
+        assert v.is_free_variable and v.arity == 0
+        assert aterm.f == self.env.core.equality
+        value = aterm.args[1]
+        core_thm = core_thm.specialize({ v : value })
+        return self.resolve_with(label, core_thm, self.env.axioms.eq_refl(X = value))
+
+with g.goal("exists(x : PRED(x)) => A = example(x : PRED(x)) => PRED(A)"):
+    assump, eq = g.intros()
+    g.rw(eq)
+    g.exact(exists_elim(assump))
+
+exists_elim_eq = g.last_proven
+print(exists_elim_eq)
+def get_example(thm, v = None, label = "_SUBST_"):
+    assert thm.term.f == env.constants.exists
+    if v is None:
+        [[v]] = thm.term.bound_names
+        v = v.upper()
+    if isinstance(v, str):
+        v = env.parser.get_var(v,0)
+    if v in thm.term.free_vars:
+        v = env.get_locally_fresh_var(v, set(x.name for x in thm.term.free_vars))
+    if isinstance(label, str):
+        label = AssumptionLabel(label)
+    thm = exists_elim_eq(thm, A = v.to_term())
+    assert label not in thm.assump_labels()
+    thm = thm.set_resolver(SubstResolver(env), label)
+    thm = thm.freeze(thm.assumption(label).free_vars)
+    return v, thm
+
+class IntroVar(BasicTactic):
+    def get_subgoals(self, v = None):
+        assert self.goal.f == self.env.constants.forall
+        if v is None:
+            [[v]] = self.goal.bound_names
+            v = v.upper()
+        if isinstance(v, str):
+            v = self.env.parser.get_var(v,0)
+        if v in self.goal.free_vars:
+            v = self.env.get_locally_fresh_var(v, set(x.name for x in self.goal.free_vars))
+        self.v = v
+        self.outputs = [v]
+        subgoal = self.goal.args[0].substitute_bvars([v.to_term()])
+        return [subgoal]
+    def build_thm(self, thm):
+        return thm.generalize(self.v)
+
+env.tactics.register("introv", IntroVar)
+
+with g.goal("exists_uq(x : PRED(x)) => exists(x : PRED(x))"):
+    assump = g.intro()
+    assump = assump.rw(co.exists_uq)
+    v, assump = get_example(assump)
+    a1, a2 = assump.split()
+    g.exact(exists_intro.modus_ponens_basic(a1))
+
+exists_uq_to_exists = g.last_proven
+
+with g.goal("exists_uq(x : PRED(x)) => PRED(A) => PRED(B) => A = B"):
+    ex_uq, pred_a, pred_b = g.intros()
+    ex_uq = ex_uq.rw(co.exists_uq)
+    x, assump = get_example(ex_uq, 'X')
+    pred_x, uq = assump.split()
+    uq = forall_elim(uq)
+    g.exact(uq(pred_a).rw(uq(pred_b).symm))
+exists_uq_is_uq = g.last_proven
+
+with g.goal("exists_uq(x : PRED(x)) => PRED(unique(x : PRED(x)))"):
+    ex_uq = g.intro()
+    g.rw(co.unique).rw(req_true(ex_uq))
+    ex = exists_uq_to_exists(ex_uq)
+    g.exact(exists_elim(ex))
+exists_uq_unique = g.last_proven
+
+with g.goal("exists_uq(x : PRED(x)) => A = unique(x : PRED(x)) => (PRED(A) && (PRED(B) => B = A))"):
+    ex_uq, a_def = g.intros()
+    g.cases()
+    with g.subgoal("PRED(A)"):
+        g.rw(a_def)
+        g.exact(exists_uq_unique(ex_uq))
+    pred_a = g.last_proven
+    pred_b = g.intro()
+    g.exact(exists_uq_is_uq(ex_uq, pred_b, pred_a))
+exists_uq_elim = g.last_proven
+
+with g.goal("!exists(x : PRED(x)) => unique(x : PRED(x)) = null"):
+    nex = g.intro()
+    nex_uq = contraposition_rev(exists_uq_to_exists, nex)
+    g.rw(co.unique)
+    g.app(req_false(nex_uq))
+nexists_to_unique_null = g.last_proven
+
+with g.goal("forall(x : PRED(x) => x = A) => PRED(A) => exists_uq(x : PRED(x))"):
+    assump, pa = g.intros()
+    g.rw(co.exists_uq)
+    g.app(exists_intro(X = "A"))
+    g.cases().exact(pa)
+    g.exact(assump)
+exists_uq_intro = g.last_proven
+
+with g.goal("forall(x : PRED(x) => x = A) => PRED(A) => unique(x : PRED(x)) = A"):
+    assump, pa = g.intros()
+    ex_uq = exists_uq_intro(assump, pa)
+    g.app(exists_uq_is_uq)
+    g.exact(ex_uq)
+    g.exact(exists_uq_unique(ex_uq))
+    g.exact(pa)
+unique_value = g.last_proven
+
+with g.goal("forall(x : x != null && PRED(x) => x = A) => PRED(A) => unique(x : x != null && PRED(x)) = A"):
+    assump, pa = g.intros()
+    an = g.cases("A = null")
+    with g.goal("!exists(x : x != null && PRED(x))"):
+        ex = g.by_contradiction().intro()
+        b, pb = get_example(ex, 'B')
+        bnn, pb = pb.split()
+        g.exact(contr(bnn, forall_elim(assump, X = 'B')(and_intro(bnn, pb)).rw(an)))
+    nex = g.last_proven
+    g.rw(an)
+    g.exact(nexists_to_unique_null(nex))
+    ann = g.get_last_output()
+    g.app(unique_value)
+    g.exact(assump)
+    g.exact(and_intro(ann, pa))
+
+with g.goal("let(A, x : BODY(x)) = take(x : require x = A; BODY(x))"):
+    g.rw(co.let, position = [0]).rw(co.take, position = [1])
+    g.app(eq_symm).app(g.last_proven)
+    with g.subgoal():
+        g.introv()
+        ex = g.intro()
+        nnx, ex = ex.split()
+        y, px = get_example(ex)
+        ya = g.cases("Y = A")
+        g.exact(px.rw(req_true(ya)).rw(ya))
+        nya = g.get_last_output()
+        nx = px.rw(req_false(nya))
+        g.app(axiom.false(contr(nnx, nx)))
+    with g.subgoal():
+        g.app(exists_intro(X = 'A'))
+        g.rw(req_true(axiom.eq_refl))
+        g.app(axiom.eq_refl)
+
+let_is_take = g.last_proven
+print(let_is_take)

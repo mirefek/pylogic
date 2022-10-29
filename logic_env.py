@@ -19,10 +19,7 @@ class LogicEnv:
 
         self.axioms = AxiomSet(self)
         self.constants = ConstantSet(self)
-        self.definitions = {
-            const : Theorem(self, definition)
-            for const, definition in self.parser.const_to_definition.items()
-        }
+        self.defs = DefinitionSet(self)
         self.basic_impl = BasicImpl(self.axioms.dummy_assump)
         self.rewriter = Rewriter(
             eq_refl = self.axioms.eq_refl,
@@ -93,6 +90,39 @@ class AxiomSet:
         if res is None: raise AttributeError(name)
         res = Theorem(self._env, res)
         self._axiom_dict[name] = res
+        return res
+
+class DefinitionSet:
+    def __init__(self, env):
+        self._env = env
+        self._constant_dict = {
+            name : const
+            for (name, sgn), const in env.parser.name_signature_to_const.items()
+        }
+        self._constant_to_core = env.parser.const_to_definition
+        self._cache = dict()
+        self._axiom_dict = dict()
+    def __getattr__(self, name):
+        res = self[name]
+        if res is None: raise AttributeError(f"No definition of '{name}'")
+        return res
+    def __getitem__(self, constant):
+        res = self._cache.get(constant, None)
+        if res is not None: return res
+        if isinstance(constant, str):
+            name = constant
+            constant = self._constant_dict.get(name, None)
+            if constant is None: return None
+            res = self._cache.get(constant, None)
+            if res is not None:
+                self._cache[name] = res
+                return res
+        else: name = None
+        core_thm = self._constant_to_core.get(constant, None)
+        if core_thm is None: return None
+        res = Theorem(self._env, core_thm)
+        if name is not None: self._cache[name] = res
+        self._cache[constant] = res
         return res
 
 class ConstantSet:
