@@ -3,6 +3,8 @@
 Constant _is_Set(X)
 Notation _is_Set   _ is_Set   PRECEDENCE =
 Axiom is_Set_is_bool : (X is_Set) is_bool
+Axiom set_not_bool : X is_Set => !X is_bool
+Axiom set_not_null : X is_Set => X != null
 
 Constant _in(X,Y)
 Notation _in      _ in _   PRECEDENCE =
@@ -10,25 +12,25 @@ Axiom in_is_bool : (x in A) is_bool
 Axiom only_in_set : x in A => A is_Set
 
 Constant set(x : PRED(x))
-Axiom set_is_set : set(x : PRED(x)) is_set
-Axiom def_in_set : A in set(x : PRED(x)) <=> A is_sane && PRED(X)
+Axiom set_is_set : set(x : PRED(x)) is_Set
+Axiom def_in_set : A in set(x : PRED(x)) <=> A is_sane && PRED(A)
 Axiom set_ext : forall(x : PRED1(x) = PRED2(x)) => set(x : PRED1(x)) = set(x : PRED2(x))
-Axiom set_repr : is_Set A => set(x : x in A) = A
+Axiom set_repr : A is_Set => set(x : x in A) = A
 
 # simple sets
 
 Definition bools := set(x : x is_bool)
 Definition sets := set(x : x is_Set)     # class of all the sets
-Definitions universe := set(x : true)
+Definition universe := set(x : true)
 
 # set constructions
 
-Definition _subset_eq(A,B) := forall(x : x in A => x in B)
+Definition _subset_eq(A,B) := A is_Set && B is_Set && forall(x : x in A => x in B)
 Notation _subset_eq      _ <:= _   PRECEDENCE =
 Definition _supset_eq(A,B) := B <:= A
 Notation _supset_eq      _ :>= _   PRECEDENCE =
 Definition _subset(A,B) := A <:= B && A != B
-Notation _subset       _ :< _   PRECEDENCE =
+Notation _subset       _ <: _   PRECEDENCE =
 Definition _supset(A,B) := B <: A
 Notation _supset       _ :> _   PRECEDENCE =
 

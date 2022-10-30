@@ -229,7 +229,7 @@ class Theorem:
                 (relabeling.get(label, label), resolver)
                 for resolver, label in self.resolvers
             )
-            resolvers = [(resolver, label) for label, resolver in resolver_d.items()]
+            resolvers = [(resolver, label) for label, resolver in resolvers_d.items()]
 
         return Theorem(self._env, res_thm, self.frozen_vars, resolvers = resolvers)
 

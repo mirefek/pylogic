@@ -244,7 +244,9 @@ class SyntaxFunApp(SyntaxWithPrecedence):
         if i == 1: return token.name == '('
         else: return token.name in (',', ')')
     def can_take_object(self, objects):
-        return len(objects) % 2 == 0
+        if len(objects) % 2 == 1: return False
+        if objects and objects[-1].name == ')': return False
+        return True
     def get_literals(self):
         return [
             (1,'('),
@@ -261,6 +263,8 @@ class Parser:
         self._operator_modifiers = dict()
         self._rule_atom = SyntaxAtom()
         self._rule_main = SyntaxMain(self)
+    def set_line_comment(self, lit):
+        self.lexer.set_line_comment(lit)
     def add_operator_modifier(self, literal, term_type1, term_type2):
         self._operator_modifiers[literal] = (term_type1, term_type2)
     def add_rule(self, rule, allow_inside = True):
@@ -335,7 +339,9 @@ class ParserState:
                 objects.append(token)
                 break
 
-            assert len(self.stack) > 1
+            if not self.stack:
+                token.show_in_line()
+                raise Exception()
             if not rule.should_pack(objects, token):
                 token.show_in_line()
                 raise Exception()

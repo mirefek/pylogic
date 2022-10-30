@@ -26,11 +26,16 @@ class Lexer:
             ('VAR', re.compile("[a-zA-Z_][_a-zA-Z0-9]*")),
         ]
         self.word_literals = set()
+        self.line_comments = set()
 
     def add_literal(self, lit):
         for i in range(1, len(lit)):
             self.prefixes.add(lit[:i])
         self.literals.add(lit)
+
+    def set_line_comment(self, lit):
+        self.add_literal(lit)
+        self.line_comments.add(lit)
 
     def parse_line(self, line, lineno = None, fname = None):
         i = 0
@@ -62,6 +67,7 @@ class Lexer:
                 raise Exception("Lexer: Unknown token")
 
             token = Token(line[i:token_end], token_type)
+            if token.name in self.line_comments: return
             token.lineno = lineno
             token.fname = fname
             token.line = line
@@ -77,6 +83,7 @@ if __name__ == "__main__":
     lexer.add_literal('-')
     lexer.add_literal('exists')
     lexer.add_literal('exists!')
+    lexer.set_line_comment('#')
 
-    for token in lexer.parse_line("X existsuje exists! - 14 => 13b - a13", lineno = 123):
+    for token in lexer.parse_line("X existsuje exists! - 14 => 13b # - a13", lineno = 123):
         token.show_in_line()

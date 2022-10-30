@@ -174,7 +174,6 @@ with g.goal("X is_bool => Y is_bool => (X => Y) => (Y => X) => X = Y"):
     yt = g.app(g.last_proven(xt,yf,xy))
     g.rw(xt).rw(yt).app(axiom.eq_refl)
 
-
 class TypingResolver(Resolver):
     def __init__(self, env, last_check = None):
         self.env = env
@@ -229,12 +228,29 @@ prove_basic_typing("forall(x : PRED(x)) is_bool")
 to_bool_elim = axiom.double_neg.rw(env.defs.to_bool.symm)
 to_bool_intro = dneg_rev.rw(env.defs.to_bool.symm)
 
+with g.goal("(A <=> B) => (A => B)"):
+    ab, a = g.intros()
+    ab = ab.rw(co._equiv)
+    g.app(to_bool_elim)
+    a = to_bool_intro(a)
+    g.app(ab(a))
+env.add_impl_rule("to_impl", g.last_proven)
+
 with g.goal("to_bool(X) = X"):
     g.app(bool_eq_by_equiv)
     g.exact(to_bool_elim)  # to_bool(X) => X
     g.exact(to_bool_intro)    # X => to_bool(X)
 
-is_bool_to_bool_eq = g.last_proven
+is_bool_to_bool_eq = g.last_proven(typing2 = "typing")
+print(is_bool_to_bool_eq)
+
+with g.goal("(A <=> B) = (A = B)"):
+    g.rw(co._equiv)
+    g.rw(is_bool_to_bool_eq(typing = "typing1"), position = [0,0])
+    g.rw(is_bool_to_bool_eq(typing = "typing2"), position = [0,1])
+    g.app(axiom.eq_refl)
+
+equiv_is_eq = g.last_proven
 
 with g.goal("X => X = true"):
     x = g.intro()
@@ -601,7 +617,8 @@ def prove_extensionality_by_definition(constant, index = None):
 prove_extensionality_by_definition(co.exists)
 prove_extensionality_by_definition(co.forall)
 prove_extensionality_by_definition(co.exists_uq)
-prove_extensionality_by_definition(co.unique)
+co_unique = co["unique", 1]
+prove_extensionality_by_definition(co_unique)
 prove_extensionality_by_definition(co.take)
 prove_extensionality_by_definition(co.let)
 
@@ -629,7 +646,7 @@ class SubstResolver(Resolver):
         assert aterm.f == self.env.core.equality
         value = aterm.args[1]
         core_thm = core_thm.specialize({ v : value })
-        return self.resolve_with(label, core_thm, self.env.axioms.eq_refl(X = value))
+        return self.resolve_with(label, core_thm, self.env.axioms.eq_refl(X = value))    
 
 with g.goal("exists(x : PRED(x)) => A = example(x : PRED(x)) => PRED(A)"):
     assump, eq = g.intros()
@@ -654,6 +671,18 @@ def get_example(thm, v = None, label = "_SUBST_"):
     thm = thm.set_resolver(SubstResolver(env), label)
     thm = thm.freeze(thm.assumption(label).free_vars)
     return v, thm
+
+def local_def(term, label = "_EQ_"):
+    term = env.to_term(term)
+    v, body = env.split_eq(term)
+    v = v.f
+    assert v.is_free_variable
+    assert v.arity == 0
+    assert v not in body.free_vars
+    if isinstance(label, str): label = AssumptionLabel(label)
+    res = env.hypothesis(label, term, frozen = True)
+    res = res.set_resolver(SubstResolver(env), label)
+    return res
 
 class IntroVar(BasicTactic):
     def get_subgoals(self, v = None):
@@ -694,7 +723,7 @@ exists_uq_is_uq = g.last_proven
 
 with g.goal("exists_uq(x : PRED(x)) => PRED(unique(x : PRED(x)))"):
     ex_uq = g.intro()
-    g.rw(co.unique).rw(req_true(ex_uq))
+    g.rw(co_unique).rw(req_true(ex_uq))
     ex = exists_uq_to_exists(ex_uq)
     g.exact(exists_elim(ex))
 exists_uq_unique = g.last_proven
@@ -713,7 +742,7 @@ exists_uq_elim = g.last_proven
 with g.goal("!exists(x : PRED(x)) => unique(x : PRED(x)) = null"):
     nex = g.intro()
     nex_uq = contraposition_rev(exists_uq_to_exists, nex)
-    g.rw(co.unique)
+    g.rw(co_unique)
     g.app(req_false(nex_uq))
 nexists_to_unique_null = g.last_proven
 
@@ -768,5 +797,126 @@ with g.goal("let(A, x : BODY(x)) = take(x : require x = A; BODY(x))"):
         g.rw(req_true(axiom.eq_refl))
         g.app(axiom.eq_refl)
 
+env.tactics.register("typing", axiom.in_is_bool)
+env.tactics.register("typing", axiom.is_Set_is_bool)
+env.tactics.register("typing", axiom.is_Fun_is_bool)
+
 let_is_take = g.last_proven
-print(let_is_take)
+def_in_set_eq = equiv_is_eq(axiom.def_in_set)
+
+with g.goal("X in A => X is_sane"):
+    x_in_a = g.intro()
+    a_is_set = axiom.only_in_set(x_in_a)
+    x_in_set = x_in_a.rw(axiom.set_repr(a_is_set).symm)
+    g.exact(x_in_set.rw(def_in_set_eq).split()[0])
+element_is_sane = g.last_proven
+
+with g.goal("A is_sane => A is_Set => A in sets"):
+    a_sane, a_set = g.intros()
+    g.rw(co.sets).rw(def_in_set_eq)
+    g.exact(and_intro(a_sane, a_set))
+sane_set_in_sets = g.last_proven
+
+with g.goal("A is_Set => B is_Set => forall(x : (x in A => x in B) && (x in B => x in A)) => A = B"):
+    a_set, b_set, assump = g.intros()
+    g.rw(axiom.set_repr(a_set).symm)
+    g.rw(axiom.set_repr(b_set).symm)
+    g.app(axiom.set_ext).introv()
+    g.app(bool_eq_by_equiv)
+    impl1, impl2 = forall_elim(assump, X = 'X').split()
+    g.exact(impl1)
+    g.exact(impl2)
+set_ext2 = g.last_proven
+
+with g.goal("B is_sane => A <:= B => A is_sane"):
+    b_sane, ab = g.intros()
+    ab = ab.rw(co._subset_eq)
+    a_set, ab = ab.split()
+    b_set, ab = ab.split()
+    b_in_sets = sane_set_in_sets(b_sane, b_set)
+    with g.goal("A = map_set(x : require x in A ; x, B)"):
+        g.app(set_ext2(a_set))
+        g.rw(co['map_set',1,0]).rw(req_true(b_set)).app(axiom.set_is_set)
+        g.introv('X')
+        g.cases()
+        with g.subgoal():
+            x_in_a = g.intro()
+            g.rw(co['map_set',1,0]).rw(req_true(b_set)).rw(def_in_set_eq)
+            g.cases().exact(element_is_sane(x_in_a))
+            g.app(exists_intro(X = 'X'))
+            x_in_b = forall_elim(ab, X = 'X')(x_in_a)
+            g.rw(req_true(x_in_a)).rw(req_true(x_in_b))
+            g.app(axiom.eq_refl)
+        with g.subgoal():
+            x_in_ms = g.intro()
+            x = x_in_ms.rw(co['map_set',1,0]).rw(req_true(b_set))
+            x = x.rw(def_in_set_eq)
+            x_sane, x = x.split()
+            _, x = get_example(x, 'X2')
+            _, x = x.split()
+            with g.goal("X2 in A"):
+                x_nin_a = g.by_contradiction().intro()
+                x2 = x.rw(req_false(x_nin_a))
+                x2 = axiom.null_is_not_sane.rw(x2.symm)
+                g.exact(contr(x2, x_sane))
+            x2_in_a = g.last_proven
+            x = x.rw(req_true(x2_in_a))
+            g.exact(x2_in_a.rw(x.symm))
+    g.rw(g.last_proven.freeze('A'))
+    g.app(element_is_sane(axiom.replacement(b_in_sets)))
+
+subset_of_sane_is_sane = g.last_proven
+
+with g.goal("f in funcs => image(f) != powerset(domain(f))"):
+    f_fun = g.intro()
+    f_sane, f_Fun = f_fun.rw(co.funcs).rw(def_in_set_eq).split()
+
+    c_def = local_def("C = set(x : x in domain(f) && x !in f[x] )")
+    g.app(neq_by_pred(PRED = "x : C !in x").freeze('C'))
+    with g.subgoal():
+        c_in_img = g.by_contradiction().intro()
+        c_in_img = c_in_img.rw(co.image).rw(co['map_set',0,0]).rw(co['map_set',1,0])
+        c_in_img = c_in_img.rw(req_true(f_Fun))
+        with g.goal("domain(f) is_Set"):
+            g.rw(co.domain).rw(req_true(f_Fun))
+            g.app(axiom.set_is_set)
+        c_in_img = c_in_img.rw(req_true(g.last_proven))
+        _,c_in_img = c_in_img.rw(def_in_set_eq).split()
+        _,c_in_img = get_example(c_in_img)
+        x_in_domain, c_in_img = c_in_img.split()
+        x_in_c = g.cases("X in C")
+        with g.subgoal():
+            _,x = x_in_c.rw(c_def).rw(def_in_set_eq).split()
+            _,x = x.split()
+            g.exact(contr(x, x_in_c.rw(c_in_img)))
+        x_nin_c = g.get_last_output()
+        with g.subgoal():
+            g.app(contr(x_nin_c))
+            g.rw(c_def).rw(def_in_set_eq).cases()
+            g.exact(element_is_sane(x_in_domain))
+            g.cases().exact(x_in_domain)
+            g.exact(x_nin_c.rw(c_in_img))
+    with g.subgoal():
+        g.app(dneg_rev).rw(co.powerset)
+        with g.goal("domain(f) is_Set"):
+            g.rw(co.domain)
+            g.rw(req_true(f_Fun))
+            g.app(axiom.set_is_set)
+        domain_is_set = g.last_proven
+        g.rw(req_true(g.last_proven))
+        g.rw(def_in_set_eq)
+        g.cases()
+        with g.subgoal(node = g.all_goals[1]):
+            g.rw(co._subset_eq)
+            g.cases().rw(c_def).app(axiom.set_is_set)
+            g.cases().exact(domain_is_set)
+            g.introv()
+            x = g.intro()
+            x = x.rw(c_def).rw(def_in_set_eq)
+            x = x.split()[1].split()[0]
+            g.exact(x)
+        g.app(subset_of_sane_is_sane(0, g.last_proven))
+        g.exact(axiom.fun_sane(f_Fun, f_sane))
+
+print("Cantor diagonal:")
+print(g.last_proven)

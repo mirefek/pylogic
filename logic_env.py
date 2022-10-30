@@ -14,6 +14,8 @@ class LogicEnv:
         self.core = LogicCore()
         self.parser = TermParser(self.core)
         self.parser.parse_file("axioms_logic")
+        self.parser.parse_file("axioms_set")
+        self.parser.parse_file("axioms_fun")
         self._name_to_label = dict()
         self.impl_rules = dict() # name => PatternLookupImpl
 
@@ -99,6 +101,7 @@ class DefinitionSet:
             name : const
             for (name, sgn), const in env.parser.name_signature_to_const.items()
         }
+        self._constant_signature_to_const = env.parser.name_signature_to_const
         self._constant_to_core = env.parser.const_to_definition
         self._cache = dict()
         self._axiom_dict = dict()
@@ -131,6 +134,7 @@ class ConstantSet:
             name : const
             for (name, sgn), const in env.parser.name_signature_to_const.items()
         }
+        self._constant_signature_to_const = env.parser.name_signature_to_const
         self._eq = env.core.equality
         self._impl = env.core.implication
     def __getattr__(self, name):
@@ -139,6 +143,10 @@ class ConstantSet:
         res = self._constant_dict.get(name, None)
         if res is None: raise AttributeError(name)
         return res
+    def __getitem__(self, key):
+        name = key[0]
+        signature = key[1:]
+        return self._constant_signature_to_const[name, signature]
 
 # TESTS
             

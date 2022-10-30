@@ -12,6 +12,7 @@ class TermParser:
         self.const_to_definition = dict()
         self.name_to_axiom = dict()
         self.syntax_parser = Parser()
+        self.syntax_parser.set_line_comment('#')
         self.last_line = 0,''
         self.cur_fname = None
 
@@ -237,7 +238,7 @@ class ParseTermState:
 
     def add_line(self, line, lineno):
         if not line.strip(): return
-        line_start= None
+        line_start = None
         if line and not line[0].isspace():
             line_start = line.split(' ', 1)[0]
         if line_start == "Constant":
@@ -307,7 +308,8 @@ class ParseTermState:
                     assoc_right = True
 
             if precedence is None:
-                assert inside or outside
+                if syntax_elements[0] is None or syntax_elements[-1] is None:
+                    assert inside or outside, line
                 precedence_kwargs = {
                     "inside": inside,
                     "outside": outside,
@@ -360,7 +362,7 @@ class ParseTermState:
         elif self.syntax_state is not None:
             self.parser.last_line = lineno, line
             self.syntax_state.parse_line(line, lineno)
-        else:
+        elif any(True for token in self.syntax_parser.lexer.parse_line(line)):
             print(f"{lineno}:{line.strip()}")
             raise Exception("Nonempty line without context")
 

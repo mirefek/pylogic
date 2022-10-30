@@ -3,6 +3,9 @@
 Constant _is_Fun(X)
 Notation _is_Fun   _ is_Fun    PRECEDENCE =
 Axiom is_Fun_is_bool : (X is_Fun) is_bool
+Axiom fun_not_bool : X is_Fun => !X is_bool
+Axiom fun_not_null : X is_Fun => X != null
+Axiom fun_not_set : X is_Fun => X !is_Set
 
 Constant _apply(f,x)
 Notation _apply   _ [ _ ]    OUTSIDE (
@@ -13,14 +16,14 @@ Constant fun(x : BODY(x))
 Definition req_sane(X) := require X is_sane; X
 Axiom def_apply_fun : fun(x : BODY(x))[A] = require A is_sane; req_sane(BODY(A))
 Axiom fun_ext : forall(x : BODY1(x) = BODY2(x)) => fun(x : BODY(x)) = fun(x : BODY(x))
-Axiom fun_repr : is_Fun f => fun(x : f[x]) = f
+Axiom fun_repr : f is_Fun => fun(x : f[x]) = f
 
 # definitions about functions
 
 Definition funcs := set(f : f is_Fun)   # the class of all sane functions
 Definition domain(f) := require f is_Fun; set(x : f[x] != null)
 Definition map_set(f,A) := require f is_Fun; map_set(x : f[x], A)
-Definition image(f) := map_set(f, universe)
+Definition image(f) := map_set(f, domain(f))
 
 Definition _is_injective(f) := f is_Fun &&
   forall(x : require x in domain(f);

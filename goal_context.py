@@ -66,17 +66,18 @@ class GoalEnv:
             parent,_ = parent
         node = GoalTreeNode(goal_term, parent)
         return GoalContext(self, node, unfreeze = unfreeze)
-    def subgoal(self, goal_term = None, unfreeze = True):
-        cur, _ = self._current_goal()
+    def subgoal(self, goal_term = None, node = None, unfreeze = True):
+        if node is None:
+            node, _ = self._current_goal()
         if goal_term is None:
-            goal_term = cur.term
+            goal_term = node.term
         else:
             goal_term = self.env.to_term(goal_term)
-        if not goal_term.equals_to(cur.term):
-            print("Current", cur)
+        if not goal_term.equals_to(node.term):
+            print("Current", node)
             print("Claimed ", goal_term)
             raise Exception("Subgoal does not match the current goal")
-        return GoalContext(self, cur, unfreeze = unfreeze)
+        return GoalContext(self, node, unfreeze = unfreeze)
 
     def get_last_output(self):
         return self.current_ctx.get_last_output()
@@ -88,6 +89,8 @@ class GoalEnv:
     def __getattr__(self, name):
         if name == "current_goal":
             return self._current_goal()[0]
+        if name == "all_goals":
+            return [node for node,_ in self.current_ctx.tree.leaf_iter()]
 
         tactic = self.env.tactics.get_tactic(name)
         if tactic is None: raise AttributeError(f"No tactic named '{name}'")
