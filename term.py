@@ -92,6 +92,10 @@ class Term:
             subst_env.subst_l = [None]+list(reversed(args))
         else:
             subst_env.subst_l = list(args)
+        if len(subst_env.subst_l) <= self.debruin_height:
+            subst_env.subst_l.extend(
+                Term(i) for i in range(len(subst_env.subst_l), self.debruin_height+1)
+            )
         subst_env._cache_subst_bound = dict()
         return subst_env._substitute_bound(self, 0)
 

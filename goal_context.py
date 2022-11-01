@@ -67,12 +67,19 @@ class GoalEnv:
         node = GoalTreeNode(goal_term, parent)
         return GoalContext(self, node, unfreeze = unfreeze)
     def subgoal(self, goal_term = None, node = None, unfreeze = True):
-        if node is None:
+        if node is None and goal_term is None:
             node, _ = self._current_goal()
         if goal_term is None:
             goal_term = node.term
         else:
             goal_term = self.env.to_term(goal_term)
+        if node is None:
+            for node, _ in self.current_ctx.tree.leaf_iter():
+                if goal_term.equals_to(node.term): break
+            else:
+                print("Claimed: ", goal_term)
+                tree.print_goals()
+                raise Exception("Subgoal does not match any of the current goals")
         if not goal_term.equals_to(node.term):
             print("Current", node)
             print("Claimed ", goal_term)

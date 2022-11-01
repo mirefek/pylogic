@@ -352,6 +352,8 @@ if __name__ == "__main__":
     logic = LogicCore()
     parser = TermParser(logic)
     parser.parse_file("axioms_logic")
+    parser.parse_file("axioms_set")
+    parser.parse_file("axioms_fun")
 
     def get_new_var(v, used_names):
         name = get_unused_name(v.name, used_names)
@@ -427,5 +429,10 @@ if __name__ == "__main__":
     test_unification(
         "forall(x : forall(y : PRED(x, y))) => forall(y : PRED(X, y))",
         "forall(x : forall(y : PRED(x, y))) => forall(y : PRED(X, y))",
+        frozen = ((), None),
+    )
+    test_unification(
+        "domain(f) is_Set",
+        "domain(require f is_Fun ; fun(y : unique(x : f [ x ] = y))) is_Set",
         frozen = ((), None),
     )

@@ -22,6 +22,7 @@ class GoalTreeNode:
             x.closed_with = x.tactic.build_thm(*(
                 c.closed_with for c in x.children
             ))
+            #assert x.term.equals_to(x.closed_with.term), x.tactic
             x = x.parent
 
     def __str__(self):

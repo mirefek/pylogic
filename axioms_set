@@ -36,8 +36,10 @@ Notation _supset       _ :> _   PRECEDENCE =
 
 Definition _union(A,B) := require A is_Set; require B is_Set; set(x : x in A || x in B)
 Definition _intersect(A,B) := require A is_Set; require B is_Set; set(x : x in A && x in B)
-Notation   _union        _ | _      INSIDE ! ASSOCRIGHT
+Definition _setdiff(A,B) := require A is_Set; require B is_Set; set(x : x in A && x !in B)
+Notation   _union        _ | _      INSIDE ! OUTSIDE ( ASSOCRIGHT
 Notation   _intersect    _ & _      INSIDE ! OUTSIDE ( ASSOCRIGHT
+Notation   _setdiff      _ \ _      INSIDE ! OUTSIDE ( ASSOCRIGHT
 Definition Union(A) := require A is_Set; set(x : exists(y : require y in A; x in y ))
 Definition Intersect(A) := require A is_Set; set(x : forall(y : require y in A; x in y ))
 Definition powerset(A) := require A is_Set; set(x : x <:= A)
