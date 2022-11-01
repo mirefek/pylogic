@@ -188,8 +188,16 @@ def cases_tactic(env, node, *args):
                     Intros(env, c, 1)
                     next_nodes.append(c.children[0])
             nodes = next_nodes
-
 env.tactics.register("cases", cases_tactic)
+
+with g.goal("(!A => (A => B) => B) => (A => B) => B"):
+    naabb, ab = g.intros()
+    a = g.cases('A')
+    g.exact(ab(a))
+    na = g.get_last_output()
+    g.exact(naabb(na, ab))
+wlog = g.last_proven
+print("WLOG:", wlog)
 
 with g.goal("X is_bool => Y is_bool => (X => Y) => (Y => X) => X = Y"):
     x_bool, y_bool, xy, yx = g.intros()
@@ -204,6 +212,7 @@ with g.goal("X is_bool => Y is_bool => (X => Y) => (Y => X) => X = Y"):
     xt,yf = g.app(g.last_proven(yt,xf,yx))
     yt = g.app(g.last_proven(xt,yf,xy))
     g.rw(xt).rw(yt).app(axiom.eq_refl)
+bool_eq_by_equiv = g.last_proven
 
 class TypingResolver(Resolver):
     def __init__(self, env, last_check = None):
@@ -228,7 +237,6 @@ env.tactics.register("typing", axiom.eq_is_bool)
 env.tactics.register("typing", axiom.impl_is_bool)
 env.tactics.register("typing", axiom.is_sane_is_bool)
 
-bool_eq_by_equiv = g.last_proven
 bool_eq_by_equiv = bool_eq_by_equiv.set_resolver(TypingResolver(env), "typing1")
 bool_eq_by_equiv = bool_eq_by_equiv.set_resolver(TypingResolver(env), "typing2")
 
