@@ -382,3 +382,6 @@ if __name__ == "__main__":
     logic = LogicCore()
     parser = TermParser(logic)
     parser.parse_file("axioms_logic")
+    parser.parse_file("axioms_set")
+    parser.parse_file("axioms_fun")
+    #print(parser.parse_str("A = B = C"))

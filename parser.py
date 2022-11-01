@@ -44,8 +44,6 @@ class SyntaxRule:
         raise Exception("Not implemented")
     def can_take_object(self, objects):
         raise Exception("Not implemented")
-    def try_inside(self, objects, token):
-        raise Exception("Not implemented")
     def get_literals(self):
         return []
 
@@ -59,7 +57,8 @@ class SyntaxRule:
             rule1 = self.parser.get_rule1(token)
             if rule1 is None: return None
             if self.can_take_token(objects, token): return None
-            if (not self.should_pack(objects, token)) or self.compatible_inner(rule1):
+            #if (not self.should_pack(objects, token)) or
+            if (not self.can_pack(objects) or self.compatible_inner(rule1)):
                 return rule1
         elif self.can_take_object(objects):
             rule0 = self.parser.get_rule0(token)
@@ -319,6 +318,10 @@ class ParserState:
         rule, objects = self.stack[-1]
         while True:
             next_rule = rule.try_inside(objects, token)
+            if False and isinstance(rule, SyntaxBasic) and isinstance(next_rule, SyntaxBasic):
+                print(rule.elements, next_rule.elements)
+                print(rule.compatible_inner(next_rule))
+                print(rule.should_pack(objects))
             if next_rule is not None:
                 next_objects = []
                 if next_rule.can_take_object(next_objects):
