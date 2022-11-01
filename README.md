@@ -27,6 +27,9 @@ There are two basic logical rules:
 * Modus ponens: if `<TERM1> => <TERM2>` is a theorem, and `<TERM1>` is a theorem, then `<TERM2>` is a theorem.
 * Specialization: for any theorem `THM`, one can obtain another theorem by assigning terms (possibly again containing varaibles) to its free variables. A free variable however cannot be substituted with a bound variable (because such assignment wouldn't be context-free). So `fun(x : A)` can be specialized into `fun(x : true)` but not into `fun(x : x)``
 
+The core logic also allows creating new definitions:
+* If `<term>` is a term containing no free variables except (distinct) `v1`, ..., `vn`, then one can introduce a new constant `c`, and add a new theorem `c(v1,...,vn) = <term>`. If some of the variables `vi` are parametrized (second order), the i-th argument of `c` introduces as many bound variables as the arity of `vi`.
+
 ### Axiomatic foundations
 
 Currently used axioms can be found in files [axioms_logic](axioms_logic), [axioms_set](axioms_set), and [axioms_fun](axioms_fun). Other files which are not a python code were just design experimentats, and are not usable by the current code. You can read the axioms on your own, here I state a few ideas behind them.
@@ -34,7 +37,7 @@ Currently used axioms can be found in files [axioms_logic](axioms_logic), [axiom
 * classical logic -- all logical connectives / predicates are outputing a boolean value (true or false). Logical connectives moreover depend only on the bool-converted values of their arguments
 * almost-decidability -- I am trying not to leave much undecidable statements for "stupid reasons" of insufficient definitions. Therefore, incorrect application of a function leads to a `null` value (except predicates / connectives, they return always boolean).
 * no need for minimality -- I intend this for playing with logic, not for theory building from minimal foundations. For this reason, I distinguish the basic "types" of booleans / sets / functions / null contrary to purely set-theory based systems where everything is a set. Eventually, I also plan to add the type of numbers.
-* `is_sane` predicate (soft type?) -- sets and functions can be defined arbitrarily. However, to avoid Russel-like paradoxes, they are forced to act only of "sane" (small) objects -- the objects that would correspond to "sets and not classes" in standard set theory.
+* `is_sane` predicate (soft type?) -- sets and functions can be defined arbitrarily. However, to avoid Russel-like paradoxes, they are forced to act only of "sane" (small) objects -- the objects that would correspond to "sets and not classes" in standard set theory. Note that `null` is not considered `sane`, so the domain of a function is well defined as the set on which the function returns non-`null` values.
 
 ### Labelled assumptions
 
