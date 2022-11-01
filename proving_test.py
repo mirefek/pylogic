@@ -16,7 +16,7 @@ with g.goal("X => !!X"):
     f = x_to_f(x)
     g.exact(f)
 
-dneg_rev = g.last_proven
+dneg_intro = g.last_proven
 
 with g.goal("(A => B) => (B => C) => (A => C)"):
     ab, bc, a = g.intros()
@@ -31,13 +31,28 @@ with g.goal("!X => X => false"):
 contr = g.last_proven
 print(contr)
 
-env.tactics.register("by_contradiction", axiom.double_neg.rw(co._neg, position=[0]))
+x = env.basic_impl.refl(env.to_term("false"))
+thm_not_false = x.rw(env.defs._neg.symm)
+thm_true = thm_not_false.rw(env.defs.true.symm)
+
 env.tactics.register("by_contradiction", env.defs._neg.symm.to_impl())
+
+with g.goal("(!!X => X) = true"):
+    g.app(axiom.impl_is_bool.rw(co._is_bool).rw(co._or))
+    assump = g.by_contradiction().intro()
+    nnx = g.app(assump.to_impl()).intro()
+    g.app(axiom.false).app(contr(nnx))
+    x = g.by_contradiction().intro()
+    nnx = g.app(assump.to_impl()).intro()
+    g.exact(x)
+dneg_elim = g.last_proven.symm(thm_true) # !!X => X
+
+env.tactics.register("by_contradiction", dneg_elim.rw(co._neg, position=[0]))
 env.tactics.register("symm", env.rewriter._eq_symm)
 
 with g.goal("(!X => X) => X"):
     a = g.intros()
-    nx = g.app(axiom.double_neg).rw(co._neg).intros()
+    nx = g.app(dneg_elim).rw(co._neg).intros()
     g.exact(contr(nx, a(nx)))
 
 assump_neg = g.last_proven
@@ -176,10 +191,6 @@ def cases_tactic(env, node, *args):
 
 env.tactics.register("cases", cases_tactic)
 
-x = env.basic_impl.refl(env.to_term("false"))
-thm_not_false = x.rw(env.defs._neg.symm)
-thm_true = thm_not_false.rw(env.defs.true.symm)
-
 with g.goal("X is_bool => Y is_bool => (X => Y) => (Y => X) => X = Y"):
     x_bool, y_bool, xy, yx = g.intros()
     x_bool = x_bool.rw(co._is_bool)
@@ -245,8 +256,8 @@ prove_basic_typing("to_bool1(X) is_bool")
 prove_basic_typing("exists(x : PRED(x)) is_bool")
 prove_basic_typing("forall(x : PRED(x)) is_bool")
 
-to_bool_elim = axiom.double_neg.rw(env.defs.to_bool.symm)
-to_bool_intro = dneg_rev.rw(env.defs.to_bool.symm)
+to_bool_elim = dneg_elim.rw(env.defs.to_bool.symm)
+to_bool_intro = dneg_intro.rw(env.defs.to_bool.symm)
 
 with g.goal("(A <=> B) => (A => B)"):
     ab, a = g.intros()
@@ -356,7 +367,7 @@ with g.goal("(if C ; X else Y) = (if to_bool(C) ; X else Y)"):
     g.rw(axiom.if_false(nc))
     with g.goal("!to_bool(C)"):
         g.rw(co.to_bool)
-        g.exact(dneg_rev(nc))
+        g.exact(dneg_intro(nc))
     g.rw(axiom.if_false(g.last_proven))
     g.app(axiom.eq_refl)
 
@@ -433,7 +444,7 @@ add_bool_calc(env.defs.true.symm)
 
 with g.goal("!!X = X"):
     g.app(bool_eq_by_equiv)
-    g.exact(axiom.double_neg).exact(dneg_rev)
+    g.exact(dneg_elim).exact(dneg_intro)
 
 double_neg_eq = g.last_proven
 
@@ -1211,7 +1222,7 @@ with g.goal("f in funs => image(f) != powerset(domain(f))"):
             g.cases().exact(x_in_domain)
             g.exact(x_nin_c.rw(c_in_img))
     with g.subgoal():
-        g.app(dneg_rev).rw(co.powerset)
+        g.app(dneg_intro).rw(co.powerset)
         domain_f_is_set = domain_is_set(f_Fun)
         g.rw(req_true(domain_f_is_set))
         g.rw(def_in_set_eq)
@@ -1460,7 +1471,9 @@ with g.goal("f is_injective => inverse(inverse(f)) = f"):
         g.rw(nimpl_symm(in_domain_intro, x_nin_d))
         x_nin_dii = x_nin_d.rw(dii_is_d.symm)
         g.exact(nimpl_symm(in_domain_intro, x_nin_dii))
-print(g.last_proven)
+inverse_inverse = g.last_proven
+print("Double inverse:")
+print(inverse_inverse)
 
 with g.goal("X != null => X = inverse(f) [Y] => f[X] = Y"):
     xnn, x_ify = g.intros()
@@ -1485,6 +1498,7 @@ with g.goal("""
     bij is_injective && domain(bij) = domain(f) && image(bij) = domain(g)
   )
 """):
+    cantor_bernstein_statement = g.current_goal.term
     f_inj, g_inj, f_into, g_into = g.intros()
     f_fun = injective_is_fun(f_inj)
     g_fun = injective_is_fun(g_inj)
@@ -1657,12 +1671,12 @@ with g.goal("""
                         x = injective_cancel_nn(g_inj, sane_to_not_null(gfx_sane), x)
                         g.exact(contr(forall_elim(y_first, X = 'X')(xs), x))
                 with g.goal("exists(x : x in S && f[x] = Y)"):
-                    x = axiom.double_neg(g.last_proven.rw(co.forall))
+                    x = dneg_elim(g.last_proven.rw(co.forall))
                     x = get_example(x, 'X').rw(to_bool1_idemp)
                     xs, fx_y = x.split()
                     g.app(exists_intro(X = 'X'))
                     g.cases().exact(xs)
-                    g.exact(axiom.double_neg(fx_y))
+                    g.exact(dneg_elim(fx_y))
                 xs, fx_y = get_example(g.last_proven).split()
                 g.app(in_image_intro(ynn)).rw(axiom.def_apply_fun)
                 g.rw(req_true(element_is_sane(xs)))
@@ -1733,5 +1747,9 @@ with g.goal("""
         x = x.rw(inverse_right(in_domain_intro(igx1_nn)))
         g.exact(x)
 
+cantor_bernstein = g.last_proven
+cantor_bernstein = cantor_bernstein.alpha_equiv_exchange(
+    cantor_bernstein_statement
+)
 print("Cantor Bernstein:")
-print(g.last_proven)
+print(cantor_bernstein)

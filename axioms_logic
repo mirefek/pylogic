@@ -5,6 +5,11 @@ Notation __impl__   _ => _ OUTSIDE = ASSOCRIGHT
 
 Axiom eq_refl : X = X
 Axiom eq_cong : X = Y => PRED(X) => PRED(Y)
+
+#   nested modus ponens follows from how the core logic handles
+#   labelled assumptions
+# Axiom nested_modus_ponens : (A => B => C) => (A => B) => (A => C)
+
 Axiom dummy_assump : X => (A => X)
 
 Constant false
@@ -13,7 +18,10 @@ Axiom false : false => X
 Definition _neg(X) := X => false
 Notation _neg ! _ INSIDE =
 Definition true := !false
-Axiom double_neg : !!X => X
+
+#   classical logic can be derived from other axioms,
+#   namely impl_is_bool
+# Axiom double_neg : !!X => X
 
 Definition _or(X,Y) := !X => Y
 Notation _or   _ || _ OUTSIDE = ASSOCRIGHT
