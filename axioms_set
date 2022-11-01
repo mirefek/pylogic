@@ -49,6 +49,8 @@ Definition map_set(x : BODY(x), A) := require A is_Set; set(y : exists(x : requi
 Definition _empty_set := set(x : false)
 Notation _empty_set       {}
 
+Axiom set_to_bool : A is_Set => to_bool(A) = (A != {})
+
 # set-theoretical axioms
 
 Axiom bools_sane : bools is_sane  # an alternative to the existence axiom

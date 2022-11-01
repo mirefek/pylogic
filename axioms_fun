@@ -35,3 +35,4 @@ Notation _is_injective   _ is_injective   PRECEDENCE =
 Definition inverse(f) := require f is_Fun; fun(y : unique(x : f[x] = y))
 
 Axiom fun_sane : f is_Fun => (f is_sane <=> domain(f) is_sane)
+Axiom fun_to_bool : f is_Fun => to_bool(f) = to_bool(domain(f))
