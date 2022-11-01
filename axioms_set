@@ -55,4 +55,4 @@ Axiom bools_sane : bools is_sane  # an alternative to the existence axiom
 Axiom powerset :    A in sets => powerset(A) in sets
 Axiom union :       A in sets => Union(A) in sets
 Axiom replacement : A in sets => map_set(x : BODY(x), A) in sets
-Axiom regularity :  A is_Set => A != {} => exists(x : require x in A; x & A = {})
+Axiom regularity :  A is_Set => A != {} => exists(x : require x in A; x !is_Set || x & A = {})
