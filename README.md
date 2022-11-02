@@ -25,7 +25,7 @@ At its core, PyLogic uses second / third order logic (I don't know exactly how o
 
 There are two basic logical rules:
 * Modus ponens: if `<TERM1> => <TERM2>` is a theorem, and `<TERM1>` is a theorem, then `<TERM2>` is a theorem.
-* Specialization: for any theorem `THM`, one can obtain another theorem by assigning terms (possibly again containing varaibles) to its free variables. A free variable however cannot be substituted with a bound variable (because such assignment wouldn't be context-free). So `fun(x : A)` can be specialized into `fun(x : true)` but not into `fun(x : x)``
+* Specialization: for any theorem `THM`, one can obtain another theorem by assigning terms (possibly again containing varaibles) to its free variables. A free variable however cannot be substituted with a bound variable (because such assignment wouldn't be context-free). So `fun(x : A)` can be specialized into `fun(x : true)` but not into `fun(x : x)`. On the other hand `fun(x : BODY(x))` can be specialized into `fun(x : x)` because it is a parameter of the free variable `BODY`.
 
 The core logic also allows creating new definitions:
 * If `<term>` is a term containing no free variables except (distinct) `v1`, ..., `vn`, then one can introduce a new constant `c`, and add a new theorem `c(v1,...,vn) = <term>`. If some of the variables `vi` are parametrized (second order), the i-th argument of `c` introduces as many bound variables as the arity of `vi`.
