@@ -9,7 +9,8 @@ Axiom eq_cong : X = Y => PRED(X) => PRED(Y)
 #   nested modus ponens follows from how the core logic handles
 #   labelled assumptions
 # Axiom nested_modus_ponens : (A => B => C) => (A => B) => (A => C)
-
+#   theoretically, I wouldn't need even dummy_assump but it would be
+#   currently a bit complicated to get around it
 Axiom dummy_assump : X => (A => X)
 
 Constant false

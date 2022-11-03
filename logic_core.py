@@ -1,4 +1,4 @@
-from term import Term, TermFunction
+from term import Term, TermFunction        
 
 class AssumptionLabel:
     def __init__(self, name="?label"):
@@ -138,11 +138,10 @@ class LogicCore:
     def __init__(self):
         self._thms = dict() # multiset -- thm to count
         self._strict_mode = False
-        self._const_to_term = dict()
-        self._termfun_interpretation = dict()
         self.equality = TermFunction((0,0), False, name = "__eq__")
         self.implication = TermFunction((0,0), False, name = "__impl__")
         self._creating_theorem = False
+        self._trusted = set()
 
     def _make_thm(self, assumptions, term, origin, free_vars = None):
         self._creating_theorem = True
@@ -157,12 +156,9 @@ class LogicCore:
         assert axiom.is_closed
         origin = "axiom", axiom_data
         return self._make_thm(dict(), axiom, origin)
-    def set_interpretation(self, termfun, python_fun):
-        if self._strict_mode:
-            raise Exception("Cannot set function interpretations in strict mode")
-        assert isinstance(termfun, TermFunction) and not termfun.is_free_variable
-        self._termfun_interpretation[termfun] = python_fun
-        if termfun.arity == 0: self._const_to_term[python_fun()] = Term(termfun)
+
+    def add_trusted_verifier(self, verifier):
+        self._trusted.add(verifier)
 
     def add_definition(self, var_list, body, name = None, bound_names = None):
         var_set = set()
@@ -193,26 +189,13 @@ class LogicCore:
         thm = self._make_thm(dict(), def_term, origin, frozenset(var_set))
         return f, thm
 
-    def calculation_step(self, term):
-        assert isinstance(term.f, TermFunction) and not term.f.is_free_variable
-        python_fun = self._termfun_interpretation.get(term.f, None)
-        if python_fun is None: return None
-        for arg in term.args:
-            assert arg.is_const and len(arg.args) == 0
-            assert arg.f in self._termfun_interpretation
-        args = [self._termfun_interpretation[arg.f]() for arg in args]
-        try:
-            res_val = f(*args)
-        except AssertionError:
-            return None
-
-        res = self._const_to_term.get(res_val, None)
-        if res is None:
-            res_f = TermFunction((), False)
-            res = Term(res_f)
-            self._const_to_term[res_val] = res
-            self._termfun_interpretation[res_f] = lambda : res_val
-
-        calc_term = Term(self.equality, (term, res))
-        origin = "calculation", term.f
-        return self._make_thm(dict(), calc_term, origin, free_vars = frozenset())
+class Verifier:
+    def __init__(self, core, name = "verifier"):
+        self.core = core
+        self.name = name
+        core.add_trusted_verifier(self)
+    def _make_thm(self, assumptions, term, data = None):
+        core = self.core
+        assert self in core._trusted
+        origin = self.name, data
+        return self.core._make_thm(assumptions, term, origin)

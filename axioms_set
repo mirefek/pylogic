@@ -43,7 +43,11 @@ Notation   _setdiff      _ \ _      INSIDE ! OUTSIDE ( ASSOCRIGHT
 Definition Union(A) := require A is_Set; set(x : exists(y : require y in A; x in y ))
 Definition Intersect(A) := require A is_Set; set(x : forall(y : require y in A; x in y ))
 Definition powerset(A) := require A is_Set; set(x : x <:= A)
-Definition unique(A) := require A is_Set; unique(x : x in A)
+
+Definition example_el(A) := require A is_Set; example(x : x in A)
+Definition unique_el(A) := require A is_Set; unique(x : x in A)
+Definition set_singleton(X) := require X is_sane; set(x : x = X)
+Definition set_pair(X,Y) := require X is_sane; require Y is_sane; set(x : x = X || x = Y)
 
 Definition map_set(x : BODY(x), A) := require A is_Set; set(y : exists(x : require x in A; y = BODY(x)))
 Definition _empty_set := set(x : false)

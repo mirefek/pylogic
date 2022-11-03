@@ -37,15 +37,41 @@ thm_true = thm_not_false.rw(env.defs.true.symm)
 
 env.tactics.register("by_contradiction", env.defs._neg.symm.to_impl())
 
-with g.goal("(!!X => X) = true"):
-    g.app(axiom.impl_is_bool.rw(co._is_bool).rw(co._or))
-    assump = g.by_contradiction().intro()
-    nnx = g.app(assump.to_impl()).intro()
+with g.goal("X is_bool => !!X => X"):
+    x_bool, nnx = g.intros()
+    x_bool = x_bool.rw(co._is_bool).rw(co._or)
+    with g.goal("X != false", unfreeze = False):
+        xf = g.by_contradiction().intro()
+        g.app(contr(nnx))
+        g.rw(xf).exact(thm_not_false)
+    g.rw(x_bool(g.last_proven)).exact(thm_true)
+dneg_elim = g.last_proven
+
+with g.goal("B => A => A"):
+    b = g.intro()
+    g.app(dneg_elim)
+    g.app(axiom.impl_is_bool)
+    naa = g.by_contradiction().intro()
+    aaf = contr(naa)
+    f = aaf(env.basic_impl._impl_refl)
+    g.exact(axiom.false(f, X = "B => false")(b))
+dummy_assump = g.last_proven(1,0)
+
+# proved without the necessity of using the axiom
+# well implication reflexivity was used during the proof
+# but that can be also directly obtained from equality congruence
+print(dummy_assump)
+
+with g.goal("!!X => X"):
+    g.app(dneg_elim)
+    g.app(axiom.impl_is_bool)
+    assump = contr(g.by_contradiction().intro())
+    nnx = g.app(assump).intro()
     g.app(axiom.false).app(contr(nnx))
     x = g.by_contradiction().intro()
-    nnx = g.app(assump.to_impl()).intro()
+    g.app(assump).intro()
     g.exact(x)
-dneg_elim = g.last_proven.symm(thm_true) # !!X => X
+dneg_elim = g.last_proven
 
 env.tactics.register("by_contradiction", dneg_elim.rw(co._neg, position=[0]))
 env.tactics.register("symm", env.rewriter._eq_symm)
@@ -686,8 +712,7 @@ def prove_extensionality_by_definition(constant, index = None):
 prove_extensionality_by_definition(co.exists)
 prove_extensionality_by_definition(co.forall)
 prove_extensionality_by_definition(co.exists_uq)
-co_unique = co["unique", 1]
-prove_extensionality_by_definition(co_unique)
+prove_extensionality_by_definition(co.unique)
 prove_extensionality_by_definition(co.take)
 prove_extensionality_by_definition(co.let)
 
@@ -818,13 +843,13 @@ exists_uq_is_uq = g.last_proven
 
 with g.goal("exists_uq(x : PRED(x)) => PRED(unique(x : PRED(x)))"):
     ex_uq = g.intro()
-    g.rw(co_unique).rw(req_true(ex_uq))
+    g.rw(co.unique).rw(req_true(ex_uq))
     ex = exists_uq_to_exists(ex_uq)
     g.exact(exists_elim(ex))
 exists_uq_unique = g.last_proven    
 
 with g.goal("unique(x : PRED(x)) != null => exists_uq(x : PRED(x))"):
-    x = g.intro().rw(co['unique',1])
+    x = g.intro().rw(co.unique)
     g.exact(req_nn_to_C(x))
 unique_nn_to_exists_uq = g.last_proven
 
@@ -841,7 +866,7 @@ exists_uq_elim_eq = g.last_proven
 
 with g.goal("!exists_uq(x : PRED(x)) => unique(x : PRED(x)) = null"):
     nex_uq = g.intro()
-    g.rw(co_unique)
+    g.rw(co.unique)
     g.app(req_false(nex_uq))
 nexists_uq_to_unique_null = g.last_proven
 

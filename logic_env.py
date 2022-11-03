@@ -76,7 +76,7 @@ class LogicEnv:
         thm = self.basic_impl.refl(term)
         label = self.to_label(label)
 
-        if frozen: thm.frozen_vars = term.free_vars
+        if frozen: thm = thm.freeze()
         thm = thm.impl_to_labels(label)
         return thm
 
