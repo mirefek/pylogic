@@ -25,6 +25,10 @@ Definition funs := set(f : f is_Fun)   # the class of all sane functions
 Definition domain(f) := require f is_Fun; set(x : f[x] != null)
 Definition map_set(f,A) := require f is_Fun; map_set(x : f[x], A)
 Definition image(f) := map_set(f, domain(f))
+Definition fun_pair(A,B) := require A is_sane; require B is_sane; fun(x : require x = A; B)
+Definition update(f,g) := require f is_Fun; require g is_Fun; fun(x : try g[x] else f[x])
+Definition fun_on(A, x:BODY(x)) := require A is_Set; fun(x : require x in A; BODY(x))
+Definition empty_fun := fun(x : null)
 
 Definition _is_injective(f) := f is_Fun &&
   forall(x : require x in domain(f);

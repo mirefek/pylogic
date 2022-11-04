@@ -1,6 +1,7 @@
 from term import TermFunction, Term
 from logic_core import Verifier
 from share_term import term_to_instr_list
+import inspect
 
 class ContainerValue:
     def __init__(self):
@@ -20,8 +21,57 @@ class ContainerValue:
             for x in self.get_all_items()
         )
         self._env = env
+        return self._has_admissible_items
     def __str__(self):
         return self.to_str(str)
+
+class CalcTerm:
+    def __init__(self, used_bvars):
+        self.cache = dict()
+        self.used_bvars = used_bvars
+    def evaluate_raw(self, bvar_values):
+        raise Exception("Not implemented")
+    def evaluate(self, bvar_values, arity = 0):
+        key = tuple(
+            v for i,v in enumerate(bvar_values)
+            if self.used_bvars & (1 << (i+arity))
+        ), arity
+        res = self.cache.get(key, None)
+        assert not (self.used_bvars >> (arity + len(bvar_values)))
+        if res is not None: return res
+        if arity == 0:
+            res = self.evaluate_raw(bvar_values)
+        else:
+            def res(*args):
+                assert len(args) == arity
+                args = tuple(reversed(args))
+                return self.evaluate(args + bvar_values)
+        self.cache[key] = res
+        return res
+
+class CalcBvar(CalcTerm):
+    def __init__(self, index):
+        self.index = index-1 # default debruin indices are from 1, here from 0
+        assert self.index >= 0
+        super().__init__(1 << self.index)
+    def evaluate_raw(self, bvar_values):
+        return bvar_values[self.index]
+
+class CalcStep(CalcTerm):
+    def __init__(self, f, signature, args):
+        used_bvars = 0
+        for numb, arg in zip(signature, args):
+            used_bvars |= (arg.used_bvars >> numb)
+        super().__init__(used_bvars)
+        self.f = f
+        self.signature = signature
+        self.args = args
+    def evaluate_raw(self, bvar_values):
+        args = [
+            arg.evaluate(bvar_values, arity = numb)
+            for arg, numb in zip(self.args, self.signature)
+        ]
+        return self.f(*args)
 
 class Calculator(Verifier):
     def __init__(self, core):
@@ -31,7 +81,7 @@ class Calculator(Verifier):
             core.implication : (lambda x,y: not x or y),
             core.equality : (lambda x,y: x == y),
         }
-        self._accepted_types = [bool, type(None)]
+        self._accepted_types = (bool, type(None))
 
     def set_interpretation(self, termfun, python_fun):
         if self.core._strict_mode:
@@ -41,37 +91,38 @@ class Calculator(Verifier):
         if termfun.arity == 0:
             self._const_to_term[python_fun()] = termfun.to_term()            
 
-    def accept_type(self, t):
+    def accept_types(self, *ts):
         if self.core._strict_mode:
             raise Exception("Cannot add accepted calculation types in strict mode")
-        if t not in self._accepted_types:
-            self._accepted_types.append(t)
+        ts = tuple(t for t in ts if t not in self._accepted_types)
+        self._accepted_types = self._accepted_types + ts
 
     def is_admissible_value(self, value):
-        if not isinstance(value, self.accepted_types): return False
-        if isinstance(value, Container):
+        if not isinstance(value, self._accepted_types):
+            return False
+        if isinstance(value, ContainerValue):
             return value.has_admissible_items(self)
         else: return True
 
     def get_value_name(self, value):
         term = self._const_to_term.get(value, None)
         if term is not None: return str(term)
-        elif isinstance(value, Container):
-            return container.to_str(self.get_value_name)
+        elif isinstance(value, ContainerValue):
+            return value.to_str(self.get_value_name)
         else:
             return str(value)
 
     def get_value_term(self, value):
         if value in self._const_to_term:
             return self._const_to_term[value]
-        assert self.is_admissible_value(value)
+        assert self.is_admissible_value(value), value
         f = TermFunction((), False, self.get_value_name(value))
-        term = v.to_term()
+        term = f.to_term()
         self._interpretation[f] = lambda : value
         self._const_to_term[value] = term
         return term
 
-    def calculate(self, term, only_try = False):
+    def calculate_ori(self, term, only_try = False):
         instr_list, terms = term_to_instr_list(term)
         values = []
         for f_args in instr_list:
@@ -98,67 +149,83 @@ class Calculator(Verifier):
         origin = "calculation", term.f
         return self._make_thm(dict(), calc_term, origin)
 
-    def add_logic_functions(self, constants):
-        self.set_interpretation(
-            constants['true',()],
-            lambda: True
-        )
-        self.set_interpretation(
-            constants['false',()],
-            lambda: False
-        )
-        self.set_interpretation(
-            constants['null',()],
-            lambda: None
-        )
-        self.set_interpretation(
-            constants['_neg',(0,)],
-            lambda x: not x
-        )
-        self.set_interpretation(
-            constants['_or',(0,0)],
-            lambda x,y: x or y
-        )
-        self.set_interpretation(
-            constants['_and',(0,0)],
-            lambda x,y: x and y
-        )
-        self.set_interpretation(
-            constants['_xor',(0,0)],
-            lambda x,y: bool(x) != bool(y)
-        )
-        self.set_interpretation(
-            constants['_equiv',(0,0)],
-            lambda x,y: bool(x) == bool(y)
-        )
-        self.set_interpretation(
-            constants['to_bool',(0,)],
-            lambda x: bool(x)
-        )
-        self.set_interpretation(
-            constants['to_bool1',(0,)],
-            lambda x: x is None or bool(x)
-        )
-        self.set_interpretation(
-            constants['_if',(0,0,0)],
-            lambda c,a,b: (a if c else b)
-        )
-        self.set_interpretation(
-            constants['_require',(0,0)],
-            lambda c,a: (a if c else None)
-        )
-        self.set_interpretation(
-            constants['_try',(0,0)],
-            lambda a,b: (a if a is not None else b)
-        )
-        self.set_interpretation(
-            constants['_is_bool',(0,)],
-            lambda x: isinstance(x, bool)
-        )
-        self.set_interpretation( # insane objects are not expected to be representable
-            constants['_is_sane',(0,)],
-            lambda x: x is not None
-        )
+
+    def calculate(self, term, only_try = False):
+        if not term.is_closed:
+            if only_try: return None
+            else: raise Exception(f"Calculated term '{term}' is not closed")
+        instr_list, terms = term_to_instr_list(term)
+        calc_terms = []
+        for f_args in instr_list:
+            f = f_args[0]
+            if isinstance(f, int):
+                calc_terms.append(CalcBvar(f))
+            else:
+                if f.is_free_variable:
+                    if only_try: return None
+                    raise Exception(f"Cannot calculate variable '{f}' (in '{term}')")
+                f_repr = self._interpretation.get(f, None)
+                if f_repr is None:
+                    if only_try: return None
+                    raise Exception(f"Calculator: constant '{f}' doesn't have an interpretation")
+                args = [calc_terms[i] for i in f_args[1:]]
+                calc_terms.append(CalcStep(f_repr, f.signature, args))
+
+        calc_term = calc_terms[-1]
+        try:
+            val = calc_term.evaluate(())
+        except AssertionError:
+            if only_try: return None
+            else: raise
+
+        res = self.get_value_term(val)
+        calc_term = Term(self.core.equality, (term, res))
+        origin = "calculation", term.f
+        return self._make_thm(dict(), calc_term, origin)
+
+    def add_functions(self, constant_dict, *function_modules, prefix = "calc_"):
+        for function_module in function_modules:
+            for full_name in dir(function_module):
+                if not full_name.startswith(prefix): continue
+                fun = getattr(function_module, full_name)
+                arity = len(inspect.signature(fun).parameters)
+                name = full_name[len(prefix):]
+                if name[0].isdigit():
+                    signature = []
+                    while name[0].isdigit():
+                        i = name.find('_')
+                        numb = int(name[:i])
+                        signature.append(int(name[:i]))
+                        name = name[i+1:]
+                    assert len(signature) == arity, (name, signature)
+                    signature = tuple(signature)
+                else:
+                    signature = (0,)*arity
+                const = constant_dict[name, signature]
+                self.set_interpretation(const, fun)
+
+class LogicCalculation:
+    def calc_true(self): return True
+    def calc_false(self): return False
+    def calc_null(self): return None
+    def calc__neg(self, x): return not x
+    def calc__or(self, x, y): return x or y
+    def calc__xor(self, x, y): return bool(x) != bool(y)
+    def calc__equiv(self, x, y): return bool(x) == bool(y)
+    def calc_to_bool(self, x): return bool(x)
+    def calc_to_bool1(self, x): return x is None or x
+    def calc__if(self, c, a, b):
+        if c: return a
+        else: return b
+    def calc__require(self, c, a):
+        if c: return a
+        else: return None
+    def calc__try(self, a, b):
+        if a is not None: return a
+        else: return b
+    def calc__is_bool(self, x): return isinstance(x, bool)
+    # insane objects except null are not expected to be representable
+    def calc__is_sane(self, x): return x is not None
 
 if __name__ == "__main__":
     from parse_term import TermParser
@@ -169,7 +236,10 @@ if __name__ == "__main__":
     parser.parse_file("axioms_set")
     parser.parse_file("axioms_fun")
     calculator = Calculator(core)
-    calculator.add_logic_functions(parser.name_signature_to_const)
+    calculator.add_functions(
+        parser.name_signature_to_const,
+        LogicCalculation(),
+    )
     def tt(s):
         return parser.parse_str(s)
     print(calculator.calculate(tt("to_bool(null)")))

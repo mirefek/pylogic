@@ -49,7 +49,9 @@ Definition unique_el(A) := require A is_Set; unique(x : x in A)
 Definition set_singleton(X) := require X is_sane; set(x : x = X)
 Definition set_pair(X,Y) := require X is_sane; require Y is_sane; set(x : x = X || x = Y)
 
+Definition select_subset(A, x:PRED(x)) := require A is_Set; set(x : require x in A; PRED(x))
 Definition map_set(x : BODY(x), A) := require A is_Set; set(y : exists(x : require x in A; y = BODY(x)))
+
 Definition _empty_set := set(x : false)
 Notation _empty_set       {}
 
@@ -62,3 +64,11 @@ Axiom powerset :    A in sets => powerset(A) in sets
 Axiom union :       A in sets => Union(A) in sets
 Axiom replacement : A in sets => map_set(x : BODY(x), A) in sets
 Axiom regularity :  A is_Set => A != {} => exists(x : require x in A; x !is_Set || x & A = {})
+
+# quantifying over a set
+
+Definition exists_in(A, x:PRED(x)) := A is_Set && exists(x : require x in A; PRED(x))
+Definition forall_in(A, x:PRED(x)) := A is_Set && forall(x : require x in A; PRED(x))
+Definition exists_uq_in(A, x:PRED(x)) := A is_Set && exists_uq(x : require x in A; PRED(x))
+Definition unique_in(A, x:PRED(x)) := require A is_Set; unique(x : require x in A; PRED(x))
+Definition take_in(A, x:BODY(x)) := require A is_Set; take(x : require x in A; BODY(x))
