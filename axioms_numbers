@@ -1,91 +1,143 @@
-Constant reals
 Constant nats
-Axiom nats_reals : nats <:= reals
+Constant reals
+Definition nz_nats := set(x : x in nats && x != 0)
+Definition nz_reals := set(x : x in reals && x != 0)
 
-Constant 0 in nats
-Constant 1 in nats
-Axiom num_nontriv : 0 != 1
-Axiom not_real : (X is_func || X is_set) => X not in reals
-Axiom infinity : reals is_object
+Axiom one_nz   : 1 != 0
+Axiom zero_nat : 0 in nats
+Axiom one_nat  : 1 in nats
+Axiom infinity : reals is_sane  # analogue to the set-theretical axiom
 
 # operations on reals
 
-Begin
-Convention x in reals
-Convention y in reals
-Convention z in reals
-Convention u in reals && u != 0
-Convention n in nats
+Axiom real_to_bool : to_bool(x) = (x = 0)
+Constant _plus(x,y)
+Constant _uminus(x)
+Constant _times(x,y)
+Constant udivide(u)
+Constant _less_than_equal(x,y)
 
-Axiom real_to_bool : to_bool(x) == (x == 0)
+Notation _plus             _ + _  INSIDE & INSIDE |     ASSOCLEFT
+Notation _uminus             - _  PRECEDENCE +
+Notation _times            _ * _  INSIDE +              ASSOCLEFT
+Notation _less_than_equal  _ <= _  PRECEDENCE =
 
-Constant plus(x,y) in reals
-Constant uminus(x) in reals
-Constant times(x,y) in reals
-Constant udivide(u) in reals
-Constant less_than_equal(x,y) is_bool
-Definition minus(x,y) := x + (-y)
-Definition divide(x,u) := x * udivide(u)
-Definition less_than(x.y) := x <= y && x != y
-Definition greater_than_equal(x,y) := y <= x
-Definition greater_than(x,y) := y < x
+# typing axioms
 
-Axiom plus_comm : x + y == y + x
-Axiom plus_assoc : x + (y + z) == (x + y) + z
-Axiom pluz_zero : x + 0 == x
-Axiom uminus : x + (-x) == 0
-Axiom times_comm : x * y == y * x
-Axiom times_assoc : x * (y * z) == (x * y) * z
-Axiom times_one : x * 1 == x
-Axiom times_plus : x * (y + z) == x * y + x * z
-Axiom times_udivide : x * udivide(u) == 1
-Axiom lte_refl : x <= x
-Axiom lte_linear : x <= y || y <= x
-Axiom lte_antisymm : (x <= y && y <= x) => x == y
+Axiom nats_reals : nats <:= reals
+Axiom not_real : (X is_Fun || X is_Set) => X !in reals
+Axiom real_not_bool : X in reals => !X is_bool
+Axiom real_not_set  : X in reals => !X is_Set
+Axiom real_not_fun  : X in reals => !X is_Fun
+
+Axiom plus_real :   x in reals => y in reals => x + y in reals
+Axiom plus_nat :      x in nats => y in nats => x + y in nats
+Axiom plus_null : x !in reals || y !in reals => x + y = null
+Axiom uminus_real : x in reals => -x in reals
+Axiom uminus_null : x !in reals => -x = null
+Axiom times_real :   x in reals => y in reals => x * y in reals
+Axiom times_nat :      x in nats => y in nats => x * y in nats
+Axiom times_null : x !in reals || y !in reals => x * y = null
+Axiom udivide_real : x in nz_reals => udivide(x) in reals
+Axiom udivide_null : x !in nz_reals => udivide(x) = null
+Axiom lte_is_bool : (x <= y) is_bool
+Axiom lte_require_reals : (x <= y) => x in reals && y in reals
+
+# axioms about basic operations
+
+Axiom plus_comm : x in reals => y in reals =>
+  x + y = y + x
+Axiom plus_assoc : x in reals => y in reals => z in reals =>
+  x + (y + z) = (x + y) + z
+Axiom pluz_zero : x in reals =>
+  x + 0 = x
+Axiom uminus : x in reals =>
+  x + (-x) = 0
+Axiom times_comm : x in reals => y in reals =>
+  x * y = y * x
+Axiom times_assoc : x in reals => y in reals => z in reals =>
+  x * (y * z) = (x * y) * z
+Axiom times_one : x in reals =>
+  x * 1 = x
+Axiom times_plus : x in reals => y in reals => z in reals =>
+  x * (y + z) = x * y + x * z
+Axiom times_udivide : x in reals => y in nz_reals =>
+  x * udivide(y) = 1
+Axiom lte_refl : x in reals =>
+  x <= x
+Axiom lte_linear : x in reals => y in reals =>
+  x <= y || y <= x
+Axiom lte_antisymm : (x <= y && y <= x) => x = y
 Axiom lte_basic : 0 <= 1
 Axiom lte_plus : x <= y => x+z <= y+z
-Axiom lte_times : x <= y => 0 < z => x*z <= y*z
+Axiom lte_times : x <= y => 0 <= z => x*z <= y*z
+
+# Further operations
+
+Definition _minus(x,y) := x + (-y)
+Definition _divide(x,y) := x * udivide(y)
+Definition _less_than(x,y) := x <= y && x != y
+
+Notation _less_than    _ < _       PRECEDENCE =
+
+Definition _greater_than_equal(x,y) := y <= x
+Definition _greater_than(x,y) := y < x
+
+Notation _minus                _ - _     PRECEDENCE +
+Notation _divide               _ / _     PRECEDENCE *
+Notation _greater_than_equal   _ >= _    PRECEDENCE =
+Notation _greater_than         _ > _     PRECEDENCE =
 
 # naturals, ...
 
-Axiom nats : n+1 in nats
 Axiom nat_induction : 
-  PROP(0) => (forall n : PROP(n) => PROP(n+1)) =>
-  forall n : PROP(n)
+  PRED(0) => forall(n : require n in nats; PRED(n) => PRED(n+1)) =>
+  forall(n : require n in nats; PRED(n))
 
-Definition ints := { n; -n }
-Definition fracs := { i / n : i in ints }
-Definition int_range(a in ints, b in ints) := { i in ints : a <= i <= b } # Notation: a..b
-Definition open_interval(x, y) := { z : a < z < b }
+Definition ints := set(x : x in nats || -x in nats)
+Definition fracs := set(x : exists(n : require n in nz_nats; x*n in nats) )
+Definition _int_range(a, b) := set(i : require i in ints; a <= i && i <= b )
+Definition open_interval(x, y) := set(z : x < z && z < y)
+
+Notation _int_range    _ .. _      INSIDE & INSIDE | OUTSIDE +
 
 # axioms of real numbers
 
-Axiom archimedean : forall x : exists n : x < n
-Definition upper_bounds(X <:= reals) == { x : forall y in X : y <= x }
-Definition lower_bounds(X <:= reals) == { x : forall y in X : y >= x }
-Definition max(X <:= reals) == unique(X & upper_bounds(X))
-Definition min(X <:= reals) == unique(X & lower_bounds(X))
-Definition supremum(X <: reals) == min(upper_bounds(X))
-Definition infimum(X <: reals) == max(lower_bounds(X))
+Axiom archimedean : forall(x : require x in reals ; exists(n : require n in nats ; x < n))
+Definition upper_bounds(X) := require X <:= reals;
+  set(x : forall(y : require y in X; y <= x))
+Definition lower_bounds(X) := require X <:= reals;
+  set(x : forall(y : require y in X; y >= x))
+Definition maximum(X) := unique_el(X & upper_bounds(X))
+Definition minimum(X) := unique_el(X & lower_bounds(X))
+Definition supremum(X) := minimum(upper_bounds(X))
+Definition infimum(X) := maximum(lower_bounds(X))
 
-Axiom supremum : X <:= reals => X != {} && lower_bounds(X) != {} => supremum(X) != null
-
-# Notation: fixpoint g(x) := BODY(g,x)
-# ===> unique(g : (x |-> BODY(g,x)))
-
-Definition iterated(f is_func, start is_object) :=
-  fixpoint g(n) := if x == 0 then start else f(g(n-1))
-
+Axiom supremum : X <:= reals => X != {} && upper_bounds(X) != {} => supremum(X) != null
 
 # floor, ceil, mod, floordiv, int_pow, divides
 
-Definition floor(x) := max({ i in ints : i <= x })
-Definition ceil(x) := max({ i in ints : i >= x })
-Definition floordiv(x,u) := floor(x/u)
-Definition mod(x,u) := x - (x // u)*u
-Definition mod1(x,u) := x - ceil(x / u)*u
+Definition floor(x) := maximum(set( i : require i in ints; i <= x ))
+Definition ceil(x) := minimum(set( i : require i in ints; i >= x ))
+Definition _floordiv(x,y) := floor(x / y)
+
+Notation _floordiv   _ // _   PRECEDENCE /
+
+Definition _mod(x,y) := x - (x // y)*y
+
+Notation _mod        _ % _   PRECEDENCE /
+
+Definition mod1(x,y) := x - ceil(x / y)*y
 Definition divides(x,y) := (x / y) in ints
 
-Definition nat_pow(x,n) := iterated((y |-> y*x), 1)
+# summing
 
-end
+Definition sum(A, x : BODY(x)) := require A is_Set;
+  unique(f :
+    domain(f) = powerset(A) &&
+    f[{}] = 0 &&
+    forall(B : require B <:= A;
+    forall(x : require x in A \ B;
+      f[B] + BODY(x) = f[B | set_singleton(x)]
+    ))
+  )[A]

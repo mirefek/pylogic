@@ -3,7 +3,7 @@ from parser import *
 from logic_core import LogicCore
 
 class TermParser:
-    def __init__(self, logic):
+    def __init__(self, logic, int_to_term = None):
         self.logic = logic
         self.name_arity_to_var = dict()
         self.name_signature_to_const = dict()
@@ -15,6 +15,7 @@ class TermParser:
         self.syntax_parser.set_line_comment('#')
         self.last_line = 0,''
         self.cur_fname = None
+        self.int_to_term = int_to_term
 
         parenth = self.add_syntax_rule(SyntaxBasic(
             '(', None, ')',
@@ -66,6 +67,11 @@ class TermParser:
     def tree_to_term(self, syntax_tree):
         return syntax_tree.rule.semantics(*syntax_tree.args)
     def _nulary_const_or_var(self, token):
+        if token.name.isdigit():
+            if self.int_to_term is None:
+                raise Exception("Numbers not supported, missing conversion to term")
+            else:
+                return self.int_to_term(int(token.name))
         bvi = self.local_context.get(token.name, None)
         if bvi is not None:
             return Term(self.depth - bvi)
@@ -87,6 +93,7 @@ class TermParser:
         if bvs:
             local_context_ori = dict(self.local_context)
             for bv in bvs:
+                assert not bv.isdigit()
                 self.local_context[bv] = self.depth
                 self.depth += 1
         term = self.tree_to_term(tree)
@@ -98,6 +105,7 @@ class TermParser:
     def _funapp(self, *args):
         fun = self._get_string(args[0])
         assert fun != None
+        assert not fun.isdigit()
         assert fun not in self.local_context
         introduce_constant = self.introduce_constant
         self.introduce_constant = False
