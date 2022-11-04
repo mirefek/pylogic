@@ -127,17 +127,24 @@ Definition _mod(x,y) := x - (x // y)*y
 
 Notation _mod        _ % _   PRECEDENCE /
 
-Definition mod1(x,y) := x - ceil(x / y)*y
 Definition divides(x,y) := (x / y) in ints
 
 # summing
 
-Definition sum(A, x : BODY(x)) := require A is_Set;
+# set_aggreg requires all the possible partial results to be unique and sane
+
+Definition set_aggreg(A, INI, x:y:AGGREG(x,y)) := require A is_Set;
   unique(f :
     domain(f) = powerset(A) &&
-    f[{}] = 0 &&
+    f[{}] = INI &&
     forall(B : require B <:= A;
-    forall(x : require x in A \ B;
-      f[B] + BODY(x) = f[B | set_singleton(x)]
+      forall(x : require x in A \ B;
+        f[B | set_singleton(x)] = AGGREG(f[B], x)
     ))
   )[A]
+
+Definition sum(A, x : BODY(x)) := set_aggreg(A, 0, x:y: x+BODY(y))
+Definition prod(A, x : BODY(x)) := set_aggreg(A, 1, x:y: x*BODY(y))
+Definition factorial(n) := require n in nats; prod(1..n, x:x)
+Definition binom(n,k) := require n in nats; require k in ints;
+  try factorial(n) * factorial(k-n) / factorial(k) else 0

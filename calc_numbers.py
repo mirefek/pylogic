@@ -91,6 +91,7 @@ class CalculationNumbers:
         if not isinstance(x, MathNumber): return False
         if not isinstance(y, MathNumber) or y.x == 0: return False
         return x.x % y.x == 0
+
     def calc_0_1_sum(self, A, body):
         if not isinstance(A, MathSet): return None
         res = 0
@@ -98,6 +99,31 @@ class CalculationNumbers:
             y = body(x)
             if not isinstance(y, MathNumber): return None
             res += y.x
+        return MathNumber(res)
+    def calc_0_1_prod(self, A, body):
+        if not isinstance(A, MathSet): return None
+        res = 1
+        for x in A.elements:
+            y = body(x)
+            if not isinstance(y, MathNumber): return None
+            res *= y.x
+        return MathNumber(res)
+
+    def calc_factorial(self, n):
+        if not isinstance(n, MathNumber) or n.x % 1 or n.x < 0: return None
+        res = 1
+        for x in range(1, int(n.x)+1): res *= x
+        return MathNumber(res)
+    def calc_binom(self, n, k):
+        if not isinstance(n, MathNumber) or n.x % 1 or n.x < 0: return None
+        if not isinstance(k, MathNumber) or k.x % 1: return None
+        n = int(n.x)
+        k = int(k.x)
+        if k < 0 or k > n: return 0
+        if n-k < k: k = n-k
+        res = 1
+        for i in range(k):
+            res = res * (n-i) // (i+1)
         return MathNumber(res)
 
 if __name__ == "__main__":
@@ -128,3 +154,4 @@ if __name__ == "__main__":
         return parser.parse_str(s)
     print(calculator.calculate(tt("sum(1..10, x : x)")))
     print(calculator.calculate(tt("sum(1..5, a:sum(1..a, x : 2*x-1))")))
+    print(calculator.calculate(tt("let(5, n : fun_on(0..n, k:binom(n,k)))")))
