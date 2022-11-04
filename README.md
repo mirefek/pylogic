@@ -43,6 +43,10 @@ Currently used axioms can be found in files [axioms_logic](axioms_logic), [axiom
 
 Although this feature is just a convenience, it is implemented already in the logical core -- a theorem in the core is not only a term but a term together with a dictionary of assumptions (`dict[AssumptionLabel, Term]`). Such assumptions can be converted into the standard assumptions (prepending `A => `), and vice versa. When modus ponens is applied, it is applied only on the main terms, and the assumptions of both statements get merged (if there is a conflict in an equally labelled assumption, the logical core raises an exception).
 
+### Trusted verifiers
+
+To increase flexibility, there is an option to make the core less secured, and add further "trusted addons" which are allowed to produce verified theorems independently of the core logic. So far, there is a [SAT verifier](sat_verifier.py), and various calculators, see e.g. [calc_numbers.py](calc_numbers.py)
+
 ## Above core
 
 I am planning to change this quite significantly, so just a few words. For proving convenience, I am mostly not using CoreTheorem but Theorem. It contains just a very little data above CoreTheorem, in particular which variables should be considered "frozen" (fixed), and how to handle some specific labels. Functionality-wise, it performs automatic unification, and offers coder friendly Python interface (various methods, `__call__` can be used for modus_ponens / variable substitutions...)
