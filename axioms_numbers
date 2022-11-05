@@ -148,3 +148,6 @@ Definition prod(A, x : BODY(x)) := set_aggreg(A, 1, x:y: x*BODY(y))
 Definition factorial(n) := require n in nats; prod(1..n, x:x)
 Definition binom(n,k) := require n in nats; require k in ints;
   try factorial(n) * factorial(k-n) / factorial(k) else 0
+Definition _power(x,n) := require n in nats; prod(1..n, _:x)
+
+Notation _power   _ ^ _   INSIDE *

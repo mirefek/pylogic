@@ -125,6 +125,10 @@ class CalculationNumbers:
         for i in range(k):
             res = res * (n-i) // (i+1)
         return MathNumber(res)
+    def calc__power(self, x, n):
+        if not isinstance(x, MathNumber) or x.x % 1: return None
+        if not isinstance(n, MathNumber) or n.x % 1 or n.x < 0: return None
+        return MathNumber(x.x ** n.x)
 
 if __name__ == "__main__":
     from parse_term import TermParser
@@ -155,3 +159,4 @@ if __name__ == "__main__":
     print(calculator.calculate(tt("sum(1..10, x : x)")))
     print(calculator.calculate(tt("sum(1..5, a:sum(1..a, x : 2*x-1))")))
     print(calculator.calculate(tt("let(5, n : fun_on(0..n, k:binom(n,k)))")))
+    print(calculator.calculate(tt("forall_in(1..10, n : sum(0..n, k:binom(n,k)) = 2^n)")))
