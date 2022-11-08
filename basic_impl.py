@@ -1,4 +1,4 @@
-from logic_core import AssumptionLabel
+from logic_core import AssumptionLabel, TermVariable
 
 # proving basic implications
 
@@ -11,9 +11,9 @@ class BasicImpl:
     def prepare_add_assump(self, thm):
         term = thm.term
         X, res = self.env.split_impl(term)
-        assert X.f.is_free_variable and X.f.arity == 0
+        assert isinstance(X.f, TermVariable) and X.f.arity == 0
         A, X2 = self.env.split_impl(res)
-        assert A.f.is_free_variable and A.f.arity == 0
+        assert isinstance(A.f, TermVariable) and A.f.arity == 0
         assert A.f != X.f, A
         assert X2.f == X.f, X2
         self._X = X

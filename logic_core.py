@@ -1,8 +1,14 @@
-from term import Term, TermFunction        
+from term import Term, TermVariable, TermConstant
 
 class AssumptionLabel:
     def __init__(self, name="?label"):
         self.name = name
+
+class DefinedConstant(TermConstant):
+    def __init__(self, signature, name):
+        super().__init__(signature, name)
+        self.def_thm = None
+        self.def_core_thm = None # to be set
 
 class CoreTheorem:
     def __init__(self, core, assumptions, term, origin, free_vars = None):
@@ -67,7 +73,7 @@ class CoreTheorem:
 
     def specialize(self, subst):
         for v,t in subst.items():
-            assert isinstance(v, TermFunction) and v.is_free_variable
+            assert isinstance(v, TermVariable)
             if not (t.debruin_height <= v.arity):
                 print(v, ":= ", t)
                 raise Exception("Cannot substitute a term with variables bound above")
@@ -138,8 +144,8 @@ class LogicCore:
     def __init__(self):
         self._thms = dict() # multiset -- thm to count
         self._strict_mode = False
-        self.equality = TermFunction((0,0), False, name = "__eq__")
-        self.implication = TermFunction((0,0), False, name = "__impl__")
+        self.equality = TermConstant((0,0), name = "__eq__")
+        self.implication = TermConstant((0,0), name = "__impl__")
         self._creating_theorem = False
         self._trusted = set()
 
@@ -166,14 +172,13 @@ class LogicCore:
         assert body.is_closed
         var_list = tuple(var_list)
         for v in var_list:
-            assert isinstance(v, TermFunction)
-            assert v.is_free_variable
+            assert isinstance(v, TermVariable)
             if v in var_set:
                 raise Exception("Variable repetition in definition")
             var_set.add(v)
         if not (body.free_vars <= var_set):
             raise Exception("var_list doesn't cover all the free variables")
-        f = TermFunction(tuple(v.arity for v in var_list), False, name = name)
+        f = DefinedConstant(tuple(v.arity for v in var_list), name = name)
         var_list_t = tuple(
             Term(v, tuple(Term(i) for i in range(v.arity,0,-1)))
             for v in var_list
@@ -187,7 +192,8 @@ class LogicCore:
         )
         origin = "definition", f
         thm = self._make_thm(dict(), def_term, origin, frozenset(var_set))
-        return f, thm
+        f.def_core_thm = thm
+        return f
 
 class Verifier:
     def __init__(self, core, name = "verifier"):

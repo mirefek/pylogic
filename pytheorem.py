@@ -1,5 +1,5 @@
 from logic_core import AssumptionLabel, CoreTheorem
-from term import Term, TermFunction, compose_substitutions, next_names
+from term import Term, TermVariable, compose_substitutions, next_names
 from unification import Unification
 
 class Resolver:
@@ -82,7 +82,7 @@ class Theorem:
         if vs is None:
             return self.exchange_frozen(())
         else:
-            if isinstance(vs, (str, TermFunction)):
+            if isinstance(vs, (str, TermVariable)):
                 vs = [vs]
             for v in vs:
                 vs = [
@@ -94,7 +94,7 @@ class Theorem:
     def freeze(self, vs = None):
         if vs is None: vs = self.free_vars
         else:
-            if isinstance(vs, (str, TermFunction)):
+            if isinstance(vs, (str, TermVariable)):
                 vs = [vs]
             vs = [
                 v if not isinstance(v, str) else self.get_var(v)
@@ -401,7 +401,7 @@ class Theorem:
         relabeling = dict()         # { AssumptionLabel | AssumptionLabel }
         label_to_position = []      # list[ AssumptionLabel, int ]
         label_closing = dict()      # { AssumptionLabel | int -> Theorem }
-        var_subst = dict()          # { TermFunction  ->   Term }
+        var_subst = dict()          # { TermVariable  ->   Term }
         for name, arg in kwargs.items():
             assump = self.assumption(name)
             if assump is not None:
@@ -568,7 +568,7 @@ class Theorem:
             for v,t in var_subst.items():
                 t_unif = substs[0].get(v, None)
                 if t_unif is not None:
-                    if not (t_unif.f.is_free_variable and
+                    if not (isinstance(t_unif.f, TermVariable) and
                             t_unif.f.to_term().equals_to(t_unif)):
                         raise Exception(f"Cannot assign variable {v}, already set by unification to {t_unif}")
                     v = t_unif.f

@@ -1,4 +1,4 @@
-from term import TermFunction, Term
+from term import TermConstant, TermVariable, Term
 from logic_core import Verifier
 from share_term import term_to_instr_list
 import inspect
@@ -86,10 +86,10 @@ class Calculator(Verifier):
     def set_interpretation(self, termfun, python_fun):
         if self.core._strict_mode:
             raise Exception("Cannot set function interpretations in strict mode")
-        assert isinstance(termfun, TermFunction) and not termfun.is_free_variable
+        assert isinstance(termfun, TermConstant)
         self._interpretation[termfun] = python_fun
         if termfun.arity == 0:
-            self._const_to_term[python_fun()] = termfun.to_term()            
+            self._const_to_term[python_fun()] = Term(termfun, ())
 
     def accept_types(self, *ts):
         if self.core._strict_mode:
@@ -116,8 +116,8 @@ class Calculator(Verifier):
         if value in self._const_to_term:
             return self._const_to_term[value]
         assert self.is_admissible_value(value), value
-        f = TermFunction((), False, self.get_value_name(value))
-        term = f.to_term()
+        f = TermConstant((), self.get_value_name(value))
+        term = Term(f, ())
         self._interpretation[f] = lambda : value
         self._const_to_term[value] = term
         return term
@@ -129,7 +129,7 @@ class Calculator(Verifier):
             if isinstance(f_args[0], int):
                 if only_try: return None
                 raise Exception(f"Cannot calculate bound variables in '{term}'")
-            if f_args[0].is_free_variable:
+            if isinstance(f_args[0], TermVariable):
                 if only_try: return None
                 raise Exception(f"Cannot calculate variable '{f_args[0]}' (in '{term}')")
             f = self._interpretation.get(f_args[0], None)
@@ -161,7 +161,7 @@ class Calculator(Verifier):
             if isinstance(f, int):
                 calc_terms.append(CalcBvar(f))
             else:
-                if f.is_free_variable:
+                if isinstance(f, TermVariable):
                     if only_try: return None
                     raise Exception(f"Cannot calculate variable '{f}' (in '{term}')")
                 f_repr = self._interpretation.get(f, None)

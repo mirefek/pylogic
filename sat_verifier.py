@@ -1,4 +1,4 @@
-from term import TermFunction
+from term import TermConstant
 from logic_core import Verifier
 from pysat.solvers import Solver
 from share_term import term_to_instr_list
@@ -13,7 +13,7 @@ class SatVerifier(Verifier):
     def set_interpretation(self, termfun, clause_generator):
         if self.core._strict_mode:
             raise Exception("Cannot set sat function interpretations in strict mode")
-        assert isinstance(termfun, TermFunction) and not termfun.is_free_variable
+        assert isinstance(termfun, TermConstant)
         self._const_to_clause_gen[termfun] = clause_generator
 
     def set_standard_functions(self, constants):

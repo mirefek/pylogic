@@ -1,5 +1,5 @@
-from term import Term, TermFunction
-from logic_core import AssumptionLabel
+from term import Term, TermConstant, TermVariable
+from logic_core import AssumptionLabel, DefinedConstant
 from pattern_lookup import PatternLookupRewrite
 from pytheorem import Theorem
 from unification import Unification
@@ -60,14 +60,14 @@ class RootRewriterList(RootRewriter):
 class RootRewriterUnfold(RootRewriter):
     def __init__(self, env, consts):
         self.env = env
-        self.c_to_def = {
-            c : self.env.defs[c]
+        assert all(
+            isinstance(c, DefinedConstant)
             for c in consts
-        }
-        assert None not in self.c_to_def.values()
+        )
+        self.to_unfold = set(consts)
     def try_rw(self, term):
-        definition = self.c_to_def.get(term.f, None)
-        if definition is None: return None
+        if term.f not in self.to_unfold: return None
+        definition = term.f.def_thm
         A,B = self.env.split_eq(definition.term)
         subst = {
             A_arg.f : term_arg
@@ -92,7 +92,7 @@ class Rewriter:
         self._env.add_impl_rule("to_impl", self._eq_to_impl)
         self._env.add_impl_rule("symm", self._eq_symm)
 
-        self._extensionality = dict() # (var : TermFunction, parindex : int) -> Theorem
+        self._extensionality = dict() # (var : TermConstant, parindex : int) -> Theorem
 
     def _build_rw_term(self, term, position):
         subterms = []
@@ -120,8 +120,8 @@ class Rewriter:
         BODY1 = BODY1_t.f
         BODY2 = BODY2_t.f
         assert BODY1.arity == num_bound, (BODY1, BODY1.arity, num_bound)
-        assert BODY1.is_free_variable, BODY1
-        assert BODY2.is_free_variable, BODY2
+        assert isinstance(BODY1, TermVariable)
+        assert isinstance(BODY2, TermVariable)
         assert BODY1_t.equals_to(BODY1.to_term()), (BODY1_t, BODY1.to_term())
         assert BODY2_t.equals_to(BODY2.to_term()), BODY2_t
 
@@ -129,13 +129,13 @@ class Rewriter:
 
         a,b = env.split_eq(main_eq)
         constant = a.f
-        assert not constant.is_free_variable, constant
+        assert isinstance(constant, TermConstant), constant
         assert constant == b.f, (constant, b.f)
         vs = [x.f for x in a.args]
         assert BODY1 in vs, (BODY1, a)
         index = vs.index(BODY1)
         assert all(
-            v.is_free_variable and v.arity == 0
+            isinstance(v, TermVariable) and v.arity == 0
             for i,v in enumerate(vs)
             if i != index
         ), a
@@ -187,7 +187,7 @@ class Rewriter:
                 cur_rw = RootRewriterSingle(arg)
             elif isinstance(arg, (tuple, list)):
                 cur_rw = self.to_root_rewriter(*arg)
-            elif isinstance(arg, TermFunction):
+            elif isinstance(arg, TermConstant):
                 consts.append(arg)
                 cur_rw = None
             else:
@@ -210,7 +210,7 @@ class Rewriter:
         extensionality = self._extensionality.get((const,index), None)
         if extensionality is not None:
             local_vars = [
-                TermFunction((), True, name = name.upper())
+                TermVariable(0, name = name.upper())
                 for name in bound_names[index]
             ]
             arg = arg.substitute_bvars((
@@ -359,12 +359,12 @@ class Rewriter:
         X = X.f
         Y = Y.f
         PRED = PRED_X.f
-        assert X.is_free_variable
+        assert isinstance(X, TermVariable)
         assert X.arity == 0
-        assert Y.is_free_variable
+        assert isinstance(Y, TermVariable)
         assert Y.arity == 0
         assert X != Y
-        assert PRED.is_free_variable
+        assert isinstance(PRED, TermVariable)
         assert PRED.arity == 1
         assert PRED_X.args[0].f == X
         assert PRED_Y.args[0].f == Y
@@ -382,7 +382,7 @@ class Rewriter:
         X, X2 = env.split_eq(eq_refl.term)
         assert X2.f == X.f
         X = X.f
-        assert X.is_free_variable and X.arity == 0
+        assert isinstance(X, TermVariable) and X.arity == 0
         if X != self._X:
             eq_refl = eq_refl.specialize({ X : self_X })
         return eq_refl

@@ -1,3 +1,5 @@
+from weakref import WeakValueDictionary
+
 def term_to_instr_list_aux(term, cache, res_list):
     res = cache.get(term, None)
     if res is not None: return res
@@ -28,9 +30,9 @@ def term_to_instr_list(term): # can be used as a key
 
 class TermCache:
     def __init__(self):
-        self._term_to_res = dict()
-        self._f_args_res = dict()
-        self._bvar_to_res = dict()
+        self._term_to_res = WeakValueDictionary()
+        self._f_args_res = WeakValueDictionary()
+        self._bvar_to_res = WeakValueDictionary()
     def get_repr(self, term):
         res = self._term_to_res.get(term, None)
         if res is not None: return None

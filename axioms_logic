@@ -58,7 +58,7 @@ Axiom example_universal : PRED(X) => PRED(example(x : PRED(x)))
 Axiom example_null : !PRED(example(x : PRED(x))) => example(x : PRED(x)) = null
 Definition exists(x : PRED(x)) := to_bool(PRED(example(x : PRED(x))))
 Definition forall(x : PRED(x)) := !exists(x : !to_bool1(PRED(x)))
-Axiom example_well_founded :
+Axiom example_well_ordered :
   forall(x : PRED(x) => PRED2(x)) =>
   PRED(example(x : PRED2(x))) =>
   example(x : PRED(x)) = example(x : PRED2(x))

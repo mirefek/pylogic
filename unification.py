@@ -1,4 +1,4 @@
-from term import Term, TermFunction, Substitution
+from term import Term, TermConstant, TermVariable
 
 class Unification:
     # frozen = None -- nothing frozen
@@ -193,7 +193,7 @@ class Unification:
 
     def _is_assignable(self, v, side):
         if v is None: return False # bound variable
-        if not v.is_free_variable: return False
+        if isinstance(v, TermConstant): return False
         v,side = self._var_copy_to_ori.get((v,side), (v,side))
         if self.frozen is not None and (
                 self.frozen[side] is None or
@@ -316,7 +316,7 @@ class Unification:
             real_ori_v, real_ori_side = self._var_copy_to_ori.get(ori_key, ori_key)
             new_v = self._var_side_copy.get((real_ori_v, real_ori_side, new_side), None)
             if new_v is None:
-                new_v = TermFunction(real_ori_v.signature, True, real_ori_v.name)
+                new_v = TermVariable(real_ori_v.arity, real_ori_v.name)
                 self._var_side_copy[real_ori_v, real_ori_side, new_side] = new_v
                 self._var_copy_to_ori[new_v, new_side] = real_ori_v, real_ori_side
             new_vars.append(new_v)
@@ -344,7 +344,7 @@ class Unification:
 # TESTS
 
 if __name__ == "__main__":
-    from term import get_unused_name, Term, TermFunction, Substitution
+    from term import get_unused_name
     from logic_core import LogicCore
     from parse_term import TermParser
     import traceback

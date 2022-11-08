@@ -9,7 +9,6 @@ class TermParser:
         self.name_signature_to_const = dict()
         self.const_to_age = dict()
         self.consts_by_age = []
-        self.const_to_definition = dict()
         self.name_to_axiom = dict()
         self.syntax_parser = Parser()
         self.syntax_parser.set_line_comment('#')
@@ -125,7 +124,7 @@ class TermParser:
     def get_var(self, name, arity):
         v = self.name_arity_to_var.get((name, arity), None)
         if v is not None: return v
-        v = TermFunction((0,)*arity, True, name = name)
+        v = TermVariable(arity, name = name)
         self.name_arity_to_var[name, arity] = v
         return v
 
@@ -142,7 +141,7 @@ class TermParser:
             elif name == "__eq__":
                 assert signature == (0,0)
                 const = self.logic.equality
-            else: const = TermFunction(signature, False, name = name)
+            else: const = TermConstant(signature, name = name)
             self.new_constant = const
             return const
         const = self.name_signature_to_const.get((name, signature), None)
@@ -174,7 +173,7 @@ class TermParser:
         res_s = set()
         for arg in term.args:
             v = arg.f
-            assert v.is_free_variable
+            assert isinstance(v, TermVariable)
             assert v not in res_s
             for i, v_arg in enumerate(arg.args):
                 assert v_arg.is_bvar
@@ -198,14 +197,13 @@ class TermParser:
         var_list = self.get_header_var_list_(header,c)
         body = self.syntax_tree_to_term(body)
         assert (c.name, c.signature) not in self.name_signature_to_const
-        c, def_thm = self.logic.add_definition(
+        c = self.logic.add_definition(
             var_list, body,
             name = c.name,
             bound_names = header.bound_names
         )
         self.register_constant(c)
-        self.const_to_definition[c] = def_thm
-        print("Definition:", def_thm)
+        print("Definition:", c.def_core_thm.term)
     def add_axiom(self, name, _, body):
         assert name.rule == self.syntax_parser._rule_atom
         name = name.args[0].name

@@ -1,20 +1,34 @@
 import re
 
 class TermFunction:
-    def __init__(self, signature, is_free_variable, name = None):
-        if name is None:
-            if is_free_variable: self.name = "?v"
-            else: self.name = "?c"
-        else:
-            self.name = name
-        self.signature = tuple(signature)
-        self.arity = len(signature)
-        self.is_free_variable = is_free_variable
-        if is_free_variable: assert all(x == 0 for x in signature)
+    def __init__(self, signature, name = None):
+        self.name = name
+        self.notation = None
+        self._signature = tuple(signature)
+
     def __str__(self):
         return self.name
     def __repr__(self):
-        return f"TermFunc({self})"
+        return f"TermFunction({self})"
+
+    @property
+    def signature(self):
+        return self._signature
+    @property
+    def arity(self):
+        return len(self._signature)
+
+class TermConstant(TermFunction):
+    def __init__(self, signature, name = "?c"):
+        super().__init__(signature, name)
+    def __repr__(self):
+        return f"TermConstant({self})"
+
+class TermVariable(TermFunction):
+    def __init__(self, arity, name = "?v"):
+        super().__init__((0,)*arity, name)
+    def __repr__(self):
+        return f"TermVariable({self})"
     def to_term(self):
         return Term(self, tuple(Term(i) for i in range(self.arity, 0, -1)))
 
@@ -112,10 +126,10 @@ class Term:
 
     @property
     def is_free_var(self):
-        return self.f is not None and self.f.is_free_variable
+        return self.f is not None and isinstance(self.f, TermVariable)
     @property
     def is_const(self):
-        return self.f is not None and not self.f.is_free_variable
+        return self.f is not None and isinstance(self.f, TermConstant)
     @property
     def is_bvar(self):
         return self.f is None
@@ -147,7 +161,7 @@ class Term:
         if res is None:
             res = []
         if not self.free_vars.difference(res): return res
-        if self.f.is_free_variable and self.f not in res:
+        if self.is_free_var and self.f not in res:
             res.append(term.f)
         for arg in args:
             get_ordered_free_vars(res)
@@ -160,7 +174,7 @@ class Term:
             i = len(bound_names) - self.debruin_height
             if i >= 0: return bound_names[i]
             else: return f"^{-i}^"
-        elif hasattr(self.f, "notation"):
+        elif self.f.notation is not None:
             return self.f.notation.objects_to_str(
                 self.args,
                 bound_names = bound_names, taken_names = taken_names,

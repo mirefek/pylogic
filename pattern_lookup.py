@@ -1,5 +1,5 @@
 import itertools
-from term import Term
+from term import Term, TermVariable
 from unification import Unification
 
 class LookupNode:
@@ -65,7 +65,7 @@ class PatternLookup:
     def _make_node(self, term, value):
         if not isinstance(value, LookupNode):
             value = LookupNodeResult([value])
-        if term.f.is_free_variable and term.f not in self._frozen_vars:
+        if isinstance(term.f, TermVariable) and term.f not in self._frozen_vars:
             return LookupNodeByTerm(universal = [value])
         res = value
         for arg in reversed(term.args):

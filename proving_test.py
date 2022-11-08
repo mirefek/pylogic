@@ -1,6 +1,6 @@
 from logic_env import LogicEnv
 from tactics import apply_spec, Intros, PatternLookupGoal, ApplyExact, BasicTactic
-from term import Term, TermFunction, get_unused_name
+from term import Term, TermVariable, get_unused_name
 from logic_core import AssumptionLabel
 from pytheorem import Theorem, Resolver
 from pattern_lookup import PatternLookupRewrite
@@ -32,10 +32,10 @@ contr = g.last_proven
 print(contr)
 
 x = env.basic_impl.refl(env.to_term("false"))
-thm_not_false = x.rw(env.defs._neg.symm)
-thm_true = thm_not_false.rw(env.defs.true.symm)
+thm_not_false = x.rw(co._neg.def_thm.symm)
+thm_true = thm_not_false.rw(co.true.def_thm.symm)
 
-env.tactics.register("by_contradiction", env.defs._neg.symm.to_impl())
+env.tactics.register("by_contradiction", co._neg.def_thm.symm.to_impl())
 
 with g.goal("X is_bool => !!X => X"):
     x_bool, nnx = g.intros()
@@ -89,7 +89,7 @@ with g.goal("(A => X) => (!A => X) => X"):
     g.by_contradiction()
     nx = g.intro().rw(co._neg)
     na = chain(ax,nx)
-    na = na.rw(env.defs._neg.symm)
+    na = na.rw(co._neg.def_thm.symm)
     g.exact(nx(nax(na)))
 
 cases_bool = g.last_proven
@@ -290,8 +290,8 @@ prove_basic_typing("to_bool1(X) is_bool")
 prove_basic_typing("exists(x : PRED(x)) is_bool")
 prove_basic_typing("forall(x : PRED(x)) is_bool")
 
-to_bool_elim = dneg_elim.rw(env.defs.to_bool.symm)
-to_bool_intro = dneg_intro.rw(env.defs.to_bool.symm)
+to_bool_elim = dneg_elim.rw(co.to_bool.def_thm.symm)
+to_bool_intro = dneg_intro.rw(co.to_bool.def_thm.symm)
 
 with g.goal("(A <=> B) => (A => B)"):
     ab, a = g.intros()
@@ -371,8 +371,7 @@ add_autoconvert(g.last_proven, co._impl, 0)
 
 def prove_autoconvert_by_definition(constant, *ii):
     for i in ii:
-        c_def = env.defs[constant]
-        header, _ = env.split_eq(c_def.term)
+        header, _ = env.split_eq(constant.def_thm.term)
         args = list(header.args)
         args[i] = Term(co.to_bool, (args[i],))
         header2 = Term(constant, args)
@@ -421,7 +420,7 @@ with g.goal("PRED(X) => exists(x : PRED(x))"):
     g.exact(axiom.example_universal)
 
 exists_intro = g.last_proven
-exists_elim = env.defs.exists.to_impl().rw(autoconvert["reduce"])
+exists_elim = co.exists.def_thm.to_impl().rw(autoconvert["reduce"])
 
 print(exists_intro) # PRED(X) => exists(x : PRED(x))
 print(exists_elim)  # exists(x : PRED(x)) => PRED(example(x : PRED(x)))
@@ -455,7 +454,7 @@ with g.goal("(X => true) = true"):
     g.exact(thm_true)
 
 add_bool_calc(g.last_proven)
-add_bool_calc(env.defs._neg.symm) # (X => false) = !X
+add_bool_calc(co._neg.def_thm.symm) # (X => false) = !X
 
 with g.goal("(true => X) = X"):
     g.app(bool_eq_by_equiv)
@@ -474,7 +473,7 @@ with g.goal("(false => X) = true"):
     g.app(axiom.false,0)
 
 add_bool_calc(g.last_proven)
-add_bool_calc(env.defs.true.symm)
+add_bool_calc(co.true.def_thm.symm)
 
 with g.goal("!!X = X"):
     g.app(bool_eq_by_equiv)
@@ -523,22 +522,22 @@ with g.goal("(!A => B) => (!B => A)"):
 
 nimpl_symm = g.last_proven
 x = nimpl_symm(B = "!B")
-x = x.rw(env.defs.to_bool.symm)
+x = x.rw(co.to_bool.def_thm.symm)
 x = x.rw(autoconvert["reduce"])
 contraposition = x
 x = x(A = "!A")
-x = x.rw(env.defs.to_bool.symm)
+x = x.rw(co.to_bool.def_thm.symm)
 x = x.rw(autoconvert["reduce"])
 impln_symm = x
 x = x(B = "!B")
-x = x.rw(env.defs.to_bool.symm)
+x = x.rw(co.to_bool.def_thm.symm)
 x = x.rw(autoconvert["reduce"])
 contraposition_rev = x
 
 null_to_false = chain(to_bool_intro, axiom.null_to_bool.to_impl())
 null_to_any = chain(null_to_false, axiom.false)
-req_true = axiom.if_true(B = "null").rw(env.defs._require.symm)
-req_false = axiom.if_false(B = "null").rw(env.defs._require.symm)
+req_true = axiom.if_true(B = "null").rw(co._require.def_thm.symm)
+req_false = axiom.if_false(B = "null").rw(co._require.def_thm.symm)
 
 with g.goal("(require A; B) => A"):
     req = g.intro()
@@ -585,12 +584,12 @@ to_bool1_req_intro = g.last_proven
 
 x = exists_intro(PRED = "x : !to_bool1(PRED(x))")
 x = nimpl_symm(x)
-x = x.rw(env.defs.forall.symm)
+x = x.rw(co.forall.def_thm.symm)
 forall_elim_full = x
 
 x = exists_elim(PRED = "x : !to_bool1(PRED(x))")
 x = impln_symm(x)
-x = x.rw(env.defs.forall.symm)
+x = x.rw(co.forall.def_thm.symm)
 forall_intro_full = x
 
 with g.goal("X => to_bool1(X)"):
@@ -632,7 +631,7 @@ with g.goal("forall(x : PRED(x) = PRED2(x)) => example(x : PRED(x)) = example(x 
     ex = g.cases("PRED(example(x : PRED2(x)))")
     assump_eq = forall_eq_elim(assump)
     with g.subgoal():
-        g.app(axiom.example_well_founded)
+        g.app(axiom.example_well_ordered)
         with g.goal("PRED(X) => PRED2(X)"):
             g.exact(assump_eq.to_impl())
         g.exact(generalize(g.last_proven, 'X'))
@@ -684,7 +683,7 @@ def prove_extensionality_by_definition(constant, index = None):
         if i2 == index: vs.append(BODY1)
         else:
             v = env.get_locally_fresh_var(
-                TermFunction((0,)*numb2, True, "A"),
+                TermVariable(numb2, "A"),
                 used_names,
             )
             used_names = v.name
@@ -736,7 +735,7 @@ class SubstResolver(Resolver):
             elif v in aterm2.free_vars:
                 return SubstResolver(self.env, label2)
 
-        assert v.is_free_variable and v.arity == 0
+        assert isinstance(v, TermVariable) and v.arity == 0
         assert aterm.f == self.env.core.equality
         value = aterm.args[1]
         core_thm = core_thm.specialize({ v : value })
@@ -795,7 +794,7 @@ def local_def(term, label = "_EQ_"):
     term = env.to_term(term)
     v, body = env.split_eq(term)
     v = v.f
-    assert v.is_free_variable
+    assert isinstance(v, TermVariable)
     assert v.arity == 0
     assert v not in body.free_vars
     if isinstance(label, str): label = AssumptionLabel(label)
@@ -1288,9 +1287,9 @@ with g.goal("inverse(f) is_Fun => f is_Fun"):
 inverse_is_of_fun = g.last_proven
 
 # req_sane(A) != null => req_sane(A) = A
-req_sane_nn_simp = req_nn_simp(C = "A is_sane").rw(env.defs.req_sane.symm, repeat = True)
+req_sane_nn_simp = req_nn_simp(C = "A is_sane").rw(co.req_sane.def_thm.symm, repeat = True)
 # req_sane(A) != null => A != null
-req_sane_nn_nn = req_nn_nn(C = "A is_sane").rw(env.defs.req_sane.symm)
+req_sane_nn_nn = req_nn_nn(C = "A is_sane").rw(co.req_sane.def_thm.symm)
 
 with g.goal("inverse(f) [Y] = unique(x : f[x] = Y)"):
     g.rw(co.inverse)
