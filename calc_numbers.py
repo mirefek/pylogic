@@ -7,6 +7,8 @@ class MathNumber:
         self.x = x
     def __hash__(self):
         return hash(self.x)
+    def __bool__(self):
+        return bool(self.x)
     def __eq__(self, other):
         return isinstance(other, MathNumber) and other.x == self.x
     def __str__(self):

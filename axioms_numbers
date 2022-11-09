@@ -10,7 +10,7 @@ Axiom infinity : reals is_sane  # analogue to the set-theretical axiom
 
 # operations on reals
 
-Axiom real_to_bool : to_bool(x) = (x = 0)
+Axiom real_to_bool : to_bool(x) = (x != 0)
 Constant _plus(x,y)
 Constant _uminus(x)
 Constant _times(x,y)
