@@ -25,7 +25,6 @@ Notation _less_than_equal  _ <= _  PRECEDENCE =
 # typing axioms
 
 Axiom nats_reals : nats <:= reals
-Axiom not_real : (X is_Fun || X is_Set) => X !in reals
 Axiom real_not_bool : X in reals => !X is_bool
 Axiom real_not_set  : X in reals => !X is_Set
 Axiom real_not_fun  : X in reals => !X is_Fun
@@ -49,9 +48,9 @@ Axiom plus_comm : x in reals => y in reals =>
   x + y = y + x
 Axiom plus_assoc : x in reals => y in reals => z in reals =>
   x + (y + z) = (x + y) + z
-Axiom pluz_zero : x in reals =>
+Axiom plus_zero : x in reals =>
   x + 0 = x
-Axiom uminus : x in reals =>
+Axiom plus_uminus : x in reals =>
   x + (-x) = 0
 Axiom times_comm : x in reals => y in reals =>
   x * y = y * x
@@ -61,16 +60,19 @@ Axiom times_one : x in reals =>
   x * 1 = x
 Axiom times_plus : x in reals => y in reals => z in reals =>
   x * (y + z) = x * y + x * z
-Axiom times_udivide : x in reals => y in nz_reals =>
-  x * udivide(y) = 1
+Axiom times_udivide : x in nz_reals =>
+  x * udivide(x) = 1
 Axiom lte_refl : x in reals =>
   x <= x
 Axiom lte_linear : x in reals => y in reals =>
   x <= y || y <= x
-Axiom lte_antisymm : (x <= y && y <= x) => x = y
+Axiom lte_antisymm : x in reals => y in reals =>
+  (x <= y && y <= x) => x = y
 Axiom lte_basic : 0 <= 1
-Axiom lte_plus : x <= y => x+z <= y+z
-Axiom lte_times : x <= y => 0 <= z => x*z <= y*z
+Axiom lte_plus : x in reals => y in reals =>
+  x <= y => x+z <= y+z
+Axiom lte_times : x in reals => y in reals => z in reals =>
+  x <= y => 0 <= z => x*z <= y*z
 
 # Further operations
 
