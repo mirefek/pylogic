@@ -932,6 +932,9 @@ with g.goal("let(A, x : BODY(x)) = take(x : require x = A; BODY(x))"):
         g.app(exists_intro(X = 'A'))
         g.rw(req_true(axiom.eq_refl))
         g.app(axiom.eq_refl)
+let_is_take = g.last_proven
+print("Take = Let")
+print(let_is_take.symm)
 
 env.tactics.register("typing", axiom.in_is_bool)
 env.tactics.register("typing", axiom.is_Set_is_bool)
@@ -940,7 +943,6 @@ env.tactics.register("typing", axiom.is_Fun_is_bool)
 env.rewriter.add_extensionality(axiom.set_ext)
 env.rewriter.add_extensionality(axiom.fun_ext)
 
-let_is_take = g.last_proven
 def_in_set_eq = equiv_is_eq(axiom.def_in_set)
 
 with g.goal("X in A => X is_sane"):
