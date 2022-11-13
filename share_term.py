@@ -33,7 +33,8 @@ class TermCache:
         self._term_to_res = WeakValueDictionary()
         self._f_args_res = WeakValueDictionary()
         self._bvar_to_res = WeakValueDictionary()
-    def get_repr(self, term):
+
+    def share(self, term):
         res = self._term_to_res.get(term, None)
         if res is not None: return None
         if term.is_bvar:
@@ -42,6 +43,13 @@ class TermCache:
             args = tuple(
                 get_shared(arg) for arg in term.args
             )
-            res = self._f_args_res.setdefault((term.f, args), term)
+            res = self._f_args_res.get((term.f, args2), None)
+            if res is None:
+                if args == term.args: res = term
+                else:
+                    res = Term(term.f, args, term.bound_names)
+                    self._term_to_res[res] = res
+                self._f_args_res[term.f, args] = res
+
         self._term_to_res[term] = res
         return res

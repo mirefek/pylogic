@@ -5,11 +5,18 @@ class TermFunction:
         self.name = name
         self.notation = None
         self._signature = tuple(signature)
+        self._to_term = None
 
     def __str__(self):
         return self.name
     def __repr__(self):
         return f"TermFunction({self})"
+    def to_term(self):
+        if self._to_term is not None: return self._to_term
+        self._to_term = Term(self, tuple(
+            Term(i) for i in range(self.arity, 0, -1)
+        ))
+        return self._to_term
 
     @property
     def signature(self):
@@ -17,6 +24,9 @@ class TermFunction:
     @property
     def arity(self):
         return len(self._signature)
+
+    def __call__(self, *args):
+        return Term(self, tuple(args))
 
 class TermConstant(TermFunction):
     def __init__(self, signature, name = "?c"):
@@ -29,8 +39,6 @@ class TermVariable(TermFunction):
         super().__init__((0,)*arity, name)
     def __repr__(self):
         return f"TermVariable({self})"
-    def to_term(self):
-        return Term(self, tuple(Term(i) for i in range(self.arity, 0, -1)))
 
 num_suffix_regex = re.compile("[0-9]+$")
 def next_names(first_name):
