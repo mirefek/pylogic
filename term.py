@@ -246,7 +246,7 @@ class Substitution:
                 changed = False
                 for v in used_boundvars:
                     if v <= term.f.arity:
-                        arg = self.run(term.args[v-1], depth)
+                        arg = self.run(term.args[term.f.arity-v], depth)
                     else:
                         arg = Term(depth+v)
                     args[v] = arg
