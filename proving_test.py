@@ -863,6 +863,13 @@ with g.goal("exists_uq(x : PRED(x)) => A = unique(x : PRED(x)) => (PRED(A) && (P
     g.exact(exists_uq_is_uq(ex_uq, pred_b, pred_a))
 exists_uq_elim_eq = g.last_proven
 
+with g.goal("exists_uq(x : PRED(x)) => PRED(A) => A = unique(x : PRED(x))"):
+    ex,pa = g.intros()
+    px, xuq, def_eq = get_example(ex, with_def_eq = True)
+    xa = xuq(pa)
+    g.exact(xa.rw(def_eq))
+exists_uq_value = g.last_proven
+
 with g.goal("!exists_uq(x : PRED(x)) => unique(x : PRED(x)) = null"):
     nex_uq = g.intro()
     g.rw(co.unique)
@@ -899,42 +906,98 @@ with g.goal("!exists_uq(x : A)"):
     g.exact(contr(x, eq))
 universal_not_uq = g.last_proven
 
-with g.goal("forall(x : x != null && PRED(x) => x = A) => PRED(A) => unique(x : x != null && PRED(x)) = A"):
-    assump, pa = g.intros()
-    an = g.cases("A = null")
-    with g.goal("!exists(x : x != null && PRED(x))"):
-        ex = g.by_contradiction().intro()
-        pb = get_example(ex, 'B')
-        bnn, pb = pb.split()
-        g.exact(contr(bnn, forall_elim(assump, X = 'B')(and_intro(bnn, pb)).rw(an)))
-    nex = g.last_proven
-    g.rw(an)
-    g.exact(nexists_to_unique_null(nex))
-    ann = g.get_last_output()
-    g.app(unique_value)
-    g.exact(assump)
-    g.exact(and_intro(ann, pa))
+with g.goal("(A && exists(x : PRED(x))) = exists(x : A && PRED(x))"):
+    a, ex = g.app(bool_eq_by_equiv).intro().split()
+    g.app(exists_intro).cases()
+    g.exact(a).exact(get_example(ex))
+    ex = g.intro()
+    a,p = get_example(ex).split()
+    g.cases().exact(a).app(exists_intro).exact(p)
+exists_and_eq = g.last_proven
+
+with g.goal("(X != null && X = require C; A) = (C && X != null && X = A)"):
+    xnn, x_req = g.app(bool_eq_by_equiv).intro().split()
+    req_nn = xnn.rw(x_req)
+    g.cases().exact(req_nn_to_C(req_nn))
+    g.cases().exact(xnn)
+    g.exact(x_req.rw(req_nn_simp(req_nn)))
+    assump = g.intro()
+    c, assump = assump.split()
+    xnn, xa = assump.split()
+    g.cases().exact(xnn)
+    g.rw(req_true(c)).exact(xa)
+nnul_eq_req_eq = g.last_proven
+
+with g.goal("exists(x : x = A && PRED(x)) = PRED(A)"):
+    ex = g.app(bool_eq_by_equiv).intro()
+    xa, px = get_example(ex).split()
+    g.exact(px.rw(xa))
+    pa = g.intro()
+    g.app(exists_intro(X = 'A'))
+    g.cases().app(axiom.eq_refl).exact(pa)
+exists_exact_simp = g.last_proven(typing2 = "typing")
+
+with g.goal("exists_uq(x : PRED(x)) => unique(x : x != null && PRED(x)) = unique(x : PRED(x))"):
+    ex_uq = g.intro()
+    px, xuq, def_eq = get_example(ex_uq, with_def_eq = True)
+    uqn = g.cases("unique(x : PRED(x)) = null")
+    g.rw(uqn)
+    g.app(nexists_uq_to_unique_null).app(contraposition_rev(exists_uq_to_exists))
+    ex = g.by_contradiction().intro()
+    ynn, py = get_example(ex, 'Y').split()
+    yx = xuq(py)
+    g.exact(contr(ynn.rw(yx).rw(def_eq), uqn))
+    uqnn = g.get_last_output()
+    with g.goal("exists_uq(x : x != null && PRED(x))"):
+        g.rw(co.exists_uq).app(exists_intro).cases().cases()
+        g.exact(uqnn.rw(def_eq.symm))
+        g.exact(px)
+        ynn, py = g.introv().intro().split()
+        g.exact(xuq(py))
+    py, yuq, def_eq2 = get_example(g.last_proven, 'Y', with_def_eq = True)
+    ynn, py = py.split()
+    g.exact(xuq(py).rw(def_eq2).rw(def_eq))
+exists_uq_unique_nnul_simp = g.last_proven
+
+with g.goal("exists_uq(x : x = A)"):
+    g.rw(co.exists_uq).app(exists_intro(X = 'A'))
+    g.cases().app(axiom.eq_refl)
+    g.introv().app(env.basic_impl._impl_refl, 0)
+exists_uq_exact = g.last_proven
+
+with g.goal("unique(x : x = A) = A"):
+    g.rw(co.unique).rw(req_true(exists_uq_exact))
+    g.exact(axiom.example_universal(axiom.eq_refl(X = 'A'), X = 'A', PRED = "x : x = A"))
+unique_exact = g.last_proven
 
 with g.goal("let(A, x : BODY(x)) = take(x : require x = A; BODY(x))"):
-    g.rw(co.let, position = [0]).rw(co.take, position = [1])
-    g.app(eq_symm).app(g.last_proven)
-    with g.subgoal():
-        g.introv()
-        ex = g.intro()
-        nnx, ex = ex.split()
-        px = get_example(ex)
-        ya = g.cases("Y = A")
-        g.exact(px.rw(req_true(ya)).rw(ya))
-        nya = g.get_last_output()
-        nx = px.rw(req_false(nya))
-        g.app(axiom.false(contr(nnx, nx)))
-    with g.subgoal():
-        g.app(exists_intro(X = 'A'))
-        g.rw(req_true(axiom.eq_refl))
-        g.app(axiom.eq_refl)
+    g.rw(co.let).rw(co.take)
+    g.rw(exists_and_eq)
+    g.rw(nnul_eq_req_eq)
+    g.rw(exists_exact_simp)
+    g.rw(exists_uq_unique_nnul_simp(exists_uq_exact)).rw(unique_exact)
+    g.app(axiom.eq_refl)
+
 let_is_take = g.last_proven
-print("Take = Let")
-print(let_is_take.symm)
+print("Let is Take")
+print(let_is_take)
+
+with g.goal("""
+  BODY(A,B,C,D,E) = take5(a:b:c:d:e:
+    require a = A; require b = B; require c = C; require d = D; require e = E;
+    BODY(a,b,c,d,e)
+  )
+"""):
+    g.rw(co.take5)
+    g.rw(exists_and_eq, repeat = True)
+    g.rw(nnul_eq_req_eq, repeat = True)
+    g.rw(exists_exact_simp, exists_and_eq.symm, repeat = True)
+    g.rw(exists_uq_unique_nnul_simp(exists_uq_exact)).rw(unique_exact)
+    g.app(axiom.eq_refl)
+
+let_is_take5 = g.last_proven
+print("Let is Take5")
+print(let_is_take5)
 
 env.tactics.register("typing", axiom.in_is_bool)
 env.tactics.register("typing", axiom.is_Set_is_bool)

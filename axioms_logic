@@ -65,6 +65,12 @@ Axiom example_well_ordered :
 Definition exists_uq(x : PRED(x)) := exists(x : PRED(x) && forall(y : PRED(y) => y = x))
 Definition unique(x : PRED(x)) := require exists_uq(x : PRED(x)); example(x : PRED(x))
 Definition take(x : BODY(x)) := unique(res : res != null && exists(x : res = BODY(x)))
+Definition take5(a:b:c:d:e: BODY(a,b,c,d,e)) :=
+  unique(res : res != null &&
+    exists(a : exists(b : exists(c : exists(d : exists(e :
+      res = BODY(a,b,c,d,e)
+    )))))
+  )
 Definition let(A, x : BODY(x)) := BODY(A)
 
 Constant _is_sane(x)
