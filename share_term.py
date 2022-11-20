@@ -1,4 +1,5 @@
 from weakref import WeakValueDictionary
+from term import Term
 
 def term_to_instr_list_aux(term, cache, res_list):
     res = cache.get(term, None)
@@ -36,14 +37,14 @@ class TermCache:
 
     def share(self, term):
         res = self._term_to_res.get(term, None)
-        if res is not None: return None
+        if res is not None: return res
         if term.is_bvar:
             res = self._bvar_to_res.setdefault(term.debruin_height, term)
         else:
             args = tuple(
-                get_shared(arg) for arg in term.args
+                self.share(arg) for arg in term.args
             )
-            res = self._f_args_res.get((term.f, args2), None)
+            res = self._f_args_res.get((term.f, args), None)
             if res is None:
                 if args == term.args: res = term
                 else:

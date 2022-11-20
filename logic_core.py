@@ -38,9 +38,10 @@ class CoreTheorem:
     def assumption(self, label): return self._assumptions.get(label, None)
     def assump_items(self): return self._assumptions.items()
     def assump_labels(self): return self._assumptions.keys()
+    def assumptions(self): return self._assumptions.values()
 
-    @classmethod
-    def _add_to_assumptions(cls, assumptions, label, term):
+    @staticmethod
+    def _add_to_assumptions(assumptions, label, term):
         ori = assumptions.setdefault(label, term)
         if ori is not term and not ori.equals_to(term):
             print("Label:", label.name)
@@ -177,7 +178,8 @@ class LogicCore:
                 raise Exception("Variable repetition in definition")
             var_set.add(v)
         if not (body.free_vars <= var_set):
-            raise Exception("var_list doesn't cover all the free variables")
+            missing = [str(v.to_term()) for v in body.free_vars-var_set]
+            raise Exception(f"var_list doesn't cover all the free variables: {missing}")
         f = DefinedConstant(tuple(v.arity for v in var_list), name = name)
         var_list_t = tuple(
             Term(v, tuple(Term(i) for i in range(v.arity,0,-1)))

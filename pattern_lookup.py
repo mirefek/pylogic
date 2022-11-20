@@ -21,8 +21,8 @@ class LookupNodeByTerm(LookupNode):
             subpatterns = dict()
         self._subpatterns = subpatterns
 
-    @classmethod
-    def take_term_iter(cls, it, term):
+    @staticmethod
+    def take_term_iter(it, term):
         for x in it:
             yield from x.take_term(term)
     def take_term(self, term):

@@ -122,34 +122,6 @@ class Calculator(Verifier):
         self._const_to_term[value] = term
         return term
 
-    def calculate_ori(self, term, only_try = False):
-        instr_list, terms = term_to_instr_list(term)
-        values = []
-        for f_args in instr_list:
-            if isinstance(f_args[0], int):
-                if only_try: return None
-                raise Exception(f"Cannot calculate bound variables in '{term}'")
-            if isinstance(f_args[0], TermVariable):
-                if only_try: return None
-                raise Exception(f"Cannot calculate variable '{f_args[0]}' (in '{term}')")
-            f = self._interpretation.get(f_args[0], None)
-            if f is None:
-                if only_try: return None
-                raise Exception(f"Calculator: constant '{f_args[0]}' doesn't have an interpretation")
-            args = [values[i] for i in f_args[1:]]
-            try:
-                val = f(*args)
-            except AssertionError:
-                if only_try: return None
-                else: raise
-            values.append(val)
-
-        res = self.get_value_term(values[-1])
-        calc_term = Term(self.core.equality, (term, res))
-        origin = "calculation", term.f
-        return self._make_thm(dict(), calc_term, origin)
-
-
     def calculate(self, term, only_try = False):
         if not term.is_closed:
             if only_try: return None
@@ -180,7 +152,7 @@ class Calculator(Verifier):
 
         res = self.get_value_term(val)
         calc_term = Term(self.core.equality, (term, res))
-        origin = "calculation", term.f
+        origin = term.f
         return self._make_thm(dict(), calc_term, origin)
 
     def add_functions(self, constant_dict, *function_modules, prefix = "calc_"):

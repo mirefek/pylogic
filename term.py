@@ -1,7 +1,7 @@
 import re
 
 class TermFunction:
-    def __init__(self, signature, name = None):
+    def __init__(self, signature, name):
         self.name = name
         self.notation = None
         self._signature = tuple(signature)
@@ -28,14 +28,24 @@ class TermFunction:
     def __call__(self, *args):
         return Term(self, tuple(args))
 
+anon_counter = 0
+
 class TermConstant(TermFunction):
-    def __init__(self, signature, name = "?c"):
+    def __init__(self, signature, name = None):
+        global anon_counter
+        if name is None:
+            name = "?c"+str(anon_counter)
+            anon_counter+=1
         super().__init__(signature, name)
     def __repr__(self):
         return f"TermConstant({self})"
 
 class TermVariable(TermFunction):
-    def __init__(self, arity, name = "?v"):
+    def __init__(self, arity, name = None):
+        global anon_counter
+        if name is None:
+            name = "?v"+str(anon_counter)
+            anon_counter+=1
         super().__init__((0,)*arity, name)
     def __repr__(self):
         return f"TermVariable({self})"
@@ -170,9 +180,9 @@ class Term:
             res = []
         if not self.free_vars.difference(res): return res
         if self.is_free_var and self.f not in res:
-            res.append(term.f)
-        for arg in args:
-            get_ordered_free_vars(res)
+            res.append(self.f)
+        for arg in self.args:
+            arg.get_ordered_free_vars(res)
         return res
 
     def to_str(self, bound_names = (), taken_names = None, **notation_kwargs):

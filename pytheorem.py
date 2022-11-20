@@ -5,8 +5,8 @@ from unification import Unification
 class Resolver:
     def run(self, label, core_thm): # returns resolved theorem, or a copy of itself
         raise Exception("Not implemented")
-    @classmethod
-    def resolve_with(self, label, core_thm, proven_label):
+    @staticmethod
+    def resolve_with(label, core_thm, proven_label):
         core_thm = core_thm.labels_to_impl(label)
         if isinstance(proven_label, Theorem):
             proven_label = proven_label.core_thm
@@ -67,6 +67,7 @@ class Theorem:
 
     def assump_items(self): return self.core_thm.assump_items()
     def assump_labels(self): return self.core_thm.assump_labels()
+    def assumptions(self): return self.core_thm.assumptions()
 
     def to_str(self):
         res = self.core_thm.to_str()

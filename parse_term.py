@@ -147,22 +147,29 @@ class TermParser:
         const = self.name_signature_to_const.get((name, signature), None)
         if const is not None: return const
 
-        assert all(x == 0 for x in signature)
+        assert all(x == 0 for x in signature), (name, signature)
         return self.get_var(name, len(signature))
 
     def parse_file(self, fname):
-        state = ParseTermState(self)
         self.cur_fname = fname
         with open(fname) as f:
-            for i,line in enumerate(f):
-                state.add_line(line, i+1)
-        self.last_line = 0,''
+            self.parse_lines(f)
         self.cur_fname = None
+
+    def parse_lines(self, lines):
+        state = ParseTermState(self)
+        for i,line in enumerate(lines):
+            state.add_line(line, i+1)
+        self.last_line = 0,''
         state.finish()
 
     def parse_str(self, s, **kwargs):
         syntax_state = self.syntax_parser.ini_state()
-        syntax_state.parse_line(s,0)
+        if '\n' in s:
+            for i,line in enumerate(s.split('\n')):
+                syntax_state.parse_line(line,i)
+        else:
+            syntax_state.parse_line(s,0)
         syntax_tree = syntax_state.finish()
         [syntax_tree] = syntax_tree.args
         return self.syntax_tree_to_term(syntax_tree, **kwargs)

@@ -1,5 +1,20 @@
 import itertools
 from calculator import ContainerValue
+from fractions import Fraction
+
+class MathNumber:
+    def __init__(self, x):
+        assert isinstance(x, (int, Fraction))
+        self.x = x
+    def __hash__(self):
+        return hash(self.x)
+    def __bool__(self):
+        return bool(self.x)
+    def __eq__(self, other):
+        return isinstance(other, MathNumber) and other.x == self.x
+    def __str__(self):
+        if self.x % 1 == 0: return str(int(self.x))
+        else: return str(self.x)
 
 class MathSet(ContainerValue):
     def __init__(self, elements):
@@ -20,7 +35,7 @@ class MathSet(ContainerValue):
         item_names = [item_to_str(x) for x in self.elements]
         item_names.sort()
         if not item_names: return '{}'
-        return "{ " + ', '.join(item_names) + " }"
+        return "{ " + ', '.join(item_names) + " }"        
 
 class MathFun(ContainerValue):
     def __init__(self, key_value_pairs):
@@ -42,13 +57,23 @@ class MathFun(ContainerValue):
         yield from self.mapping.keys()
         yield from self.mapping.values()
     def to_str(self, item_to_str):
-        item_names = [
-            item_to_str(x)+" |-> "+item_to_str(y)
-            for x,y in self.mapping.items()
-        ]
-        item_names.sort()
-        if not item_names: return 'empty_fun'
-        else: return "( " + '; '.join(item_names) + " )"
+        if self.is_seq():
+            item_names = [
+                item_to_str(self.mapping[MathNumber(i)])
+                for i in range(len(self.mapping))
+            ]
+            if not item_names: return '[]'
+            else: return '[ ' + ', '.join(item_names) + ' ]'
+        else:
+            item_names = [
+                item_to_str(x)+" |-> "+item_to_str(y)
+                for x,y in self.mapping.items()
+            ]
+            item_names.sort()
+            if not item_names: return 'empty_fun'
+            else: return "( " + '; '.join(item_names) + " )"
+    def is_seq(self):
+        return set(self.mapping.keys()) == set(map(MathNumber, range(len(self.mapping))))
 
 class SetCalculation:
     def calc__is_Set(self, x): return isinstance(x, MathSet)
