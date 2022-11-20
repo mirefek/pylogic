@@ -15,6 +15,7 @@ class TermParser:
         self.last_line = 0,''
         self.cur_fname = None
         self.int_to_term = int_to_term
+        self.verbose = False
 
         parenth = self.add_syntax_rule(SyntaxBasic(
             '(', None, ')',
@@ -150,11 +151,14 @@ class TermParser:
         assert all(x == 0 for x in signature), (name, signature)
         return self.get_var(name, len(signature))
 
-    def parse_file(self, fname):
+    def parse_file(self, fname, verbose = False):
+        verbose_ori=  self.verbose
+        self.verbose = verbose
         self.cur_fname = fname
         with open(fname) as f:
             self.parse_lines(f)
         self.cur_fname = None
+        self.verbose = verbose_ori
 
     def parse_lines(self, lines):
         state = ParseTermState(self)
@@ -210,14 +214,16 @@ class TermParser:
             bound_names = header.bound_names
         )
         self.register_constant(c)
-        print("Definition:", c.def_core_thm.term)
+        if self.verbose:
+            print("Definition:", c.def_core_thm.term)
     def add_axiom(self, name, _, body):
         assert name.rule == self.syntax_parser._rule_atom
         name = name.args[0].name
         body = self.syntax_tree_to_term(body)
         axiom = self.logic.add_axiom(body, [self.cur_fname, self.last_line[0]])
         self.name_to_axiom[name] = axiom
-        print("Axiom:", axiom)
+        if self.verbose:
+            print("Axiom:", axiom)
 
     def check_eq_rule(self, f_name, rule):
         if self.eq_precedence is None and f_name == "__eq__":
@@ -394,7 +400,7 @@ class ParseTermState:
 if __name__ == "__main__":
     logic = LogicCore()
     parser = TermParser(logic)
-    parser.parse_file("axioms_logic")
-    parser.parse_file("axioms_set")
-    parser.parse_file("axioms_fun")
+    parser.parse_file("axioms_logic", verbose = True)
+    parser.parse_file("axioms_set", verbose = True)
+    parser.parse_file("axioms_fun", verbose = True)
     #print(parser.parse_str("A = B = C"))

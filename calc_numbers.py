@@ -182,7 +182,7 @@ if __name__ == "__main__":
         return parser.parse_str(s)
     print(calculator.calculate(tt("sum(1..10, x : x)")))
     print(calculator.calculate(tt("sum(1..5, a:sum(1..a, x : 2*x-1))")))
-    print(calculator.calculate(tt("let(5, n : fun_on(0..n, k:binom(n,k)))")))
+    print(calculator.calculate(tt("fun_on(0..5, n : fun_on(0..n, k:binom(n,k)))")))
     print(calculator.calculate(tt("forall_in(1..10, n : sum(0..n, k:binom(n,k)) = 2^n)")))
 
     print(calculator.calculate(tt("""

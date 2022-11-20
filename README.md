@@ -1,8 +1,10 @@
 # PyLogic -- Pythonic Interactive Theorem Prover
 
-PyLogic is a logical system for formally stating and proving theorems (a bit similar like Isabelle / Coq / Lean...). Axioms / definitions can be parsed from external files, the proving part is done as a pure python code. It is already possible to play with it, and prove basic facts about sets / functions. As a challenge, I proved the Cantor-Bernstein theorem at the end of the file [proving_test.py](proving_test.py). On the other hand, the code is rather preliminary, not recommended for large theory building.
+PyLogic is a logical system for formally stating and proving theorems (a bit similar like Isabelle / Coq / Lean...). Axioms / definitions can be parsed from external files, the proving part is done as a pure python code. It is already possible to play with it, and prove basic facts about sets / functions. As a challenge, I proved the Cantor-Bernstein theorem at the end of the file [`proving_test.py`](proving_test.py). On the other hand, the code is rather preliminary, not recommended for large theory building.
 
 ## Quick start
+
+### Goal-directed proving
 
 For trying it out, first run
 ```
@@ -13,6 +15,11 @@ to see some of the theorems I have proven in that file. As a further step, open 
 * terminate one of the blocks `with g.goal():` prematurely, e.g. by commenting out the end, or putting `if False:` there. You will get an exception of unfinished proof, and the program will print the remaining goals.
 
 (sorry for occasional not very comprehensible errors)
+
+### Other features not yet in the main environment
+
+* Calculation -- run / experiment with [`calc_numbers.py`](calc_numbers.py), this is the only place where I support numbers so far.
+* Hammers -- There is simple [SAT solver](sat_verifier.py), but more interestingly, an option to run external first order theorem provers: put [`vampire`](https://vprover.github.io/) or [`eprover`](https://wwwlehre.dhbw-stuttgart.de/~sschulz/E/Download.html) executable to the main directory, and then run / experiment with [`fof_verifier.py`](fof_verifier.py)
 
 ## Logical foundations
 
@@ -32,11 +39,11 @@ The core logic also allows creating new definitions:
 
 ### Axiomatic foundations
 
-Currently used axioms can be found in files [axioms_logic](axioms_logic), [axioms_set](axioms_set), and [axioms_fun](axioms_fun). Other files which are not a python code were just design experimentats, and are not usable by the current code. You can read the axioms on your own, here I state a few ideas behind them.
+Currently used axioms can be found in files [`axioms_logic`](axioms_logic), [`axioms_set`](axioms_set), and [`axioms_fun`](axioms_fun). Partially supported (via calculators) are also [`axioms_numbers`](axioms_numbers). You can read the axioms on your own, here I state a few ideas behind them.
 
 * classical logic -- all logical connectives / predicates are outputing a boolean value (true or false). Logical connectives moreover depend only on the bool-converted values of their arguments
-* almost-decidability -- I am trying not to leave much undecidable statements for "stupid reasons" of insufficient definitions. Therefore, incorrect application of a function leads to a `null` value (except predicates / connectives, they return always boolean).
-* no need for minimality -- I intend this for playing with logic, not for theory building from minimal foundations. For this reason, I distinguish the basic "types" of booleans / sets / functions / null contrary to purely set-theory based systems where everything is a set. Eventually, I also plan to add the type of numbers.
+* almost-decidability -- I am trying not to leave much undecidable statements for "stupid reasons" of insufficient definitions. Therefore, incorrect application of a function leads to a `null` value (except predicates / boolean connectives, they return always boolean).
+* no need for minimality -- I intend this for playing with logic, not for theory building from minimal foundations. For this reason, I distinguish the basic "types" of booleans / sets / functions / null contrary to purely set-theory based systems where everything is a set.
 * `is_sane` predicate (soft type?) -- sets and functions can be defined arbitrarily. However, to avoid Russel-like paradoxes, they are forced to act only of "sane" (small) objects -- the objects that would correspond to "sets and not classes" in standard set theory. Note that `null` is not considered `sane`, so the domain of a function is well defined as the set on which the function returns non-`null` values.
 
 ### Labelled assumptions
@@ -45,10 +52,12 @@ Although this feature is just a convenience, it is implemented already in the lo
 
 ### Trusted verifiers
 
-To increase flexibility, there is an option to make the core less secured, and add further "trusted addons" which are allowed to produce verified theorems independently of the core logic. So far, there is a [SAT verifier](sat_verifier.py), and various calculators, see e.g. [calc_numbers.py](calc_numbers.py)
+To increase flexibility, there is an option to make the core less secured, and add further "trusted addons" which are allowed to produce verified theorems independently of the core logic. This is the case of [SAT verifier](sat_verifier.py), [FOF verifier](fof_verifier.py), and [calculators](calc_numbers.py).
 
 ## Above core
 
 I am planning to change this quite significantly, so just a few words. For proving convenience, I am mostly not using CoreTheorem but Theorem. It contains just a very little data above CoreTheorem, in particular which variables should be considered "frozen" (fixed), and how to handle some specific labels. Functionality-wise, it performs automatic unification, and offers coder friendly Python interface (various methods, `__call__` can be used for modus_ponens / variable substitutions...)
 
 For matching a goal, there is a goal context creating a tree-plan of constructing the desired term. Every subgoal is just the simple term (context is not checked but possible to lookup). This tree is extended by calling tactics as methods of `env.goal_env`. An assumption returned from `g.intros()` is just a labelled implication reflexivity which is eventually (when the final proof is constructed) turned into a positional assumption.
+
+A local definition is an assumption of the form `V = <term>` where `V` is a fixed variable not contained in `<term>`. Once this assumptions happens to contain the only occurence of `V` in the theorem, it is automatically resolved using reflexivity of equality.

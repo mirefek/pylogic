@@ -100,7 +100,6 @@ with g.goal("A || B => (A => X) => (B => X) => X"):
     g.app(cases_bool(ax))
     na = g.intro()
     g.app(bx).app(ab).exact(na)
-    print("ab", ab)
 
 cases_or = g.last_proven
 env.add_impl_rule("to_cases", cases_or)
@@ -187,10 +186,6 @@ with g.goal("!(A => B) => !B"):
 nimpl_elim2 = g.last_proven
 
 env.add_impl_rule("split", nimpl_elim1, nimpl_elim2)
-
-h = env.hypothesis('tmp', "X || Y")
-h1 = h.apply_rule("to_cases")
-print(h1)
 
 def cases_tactic(env, node, *args):
     if not args:
