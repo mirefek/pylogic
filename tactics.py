@@ -190,23 +190,10 @@ class PatternLookupGoal(PatternLookup):
 
 def assumed(env, node):
     n = node
-    res = None
-    while n:
-        out = n.tactic_output
-        if isinstance(out, Theorem):
-            if out.term.equals_to(node.term):
-                res = out
-                break
-        elif isinstance(out, (list, tuple)):
-            for x in out:
-                if isinstance(x, Theorem):
-                    if x.term.equals_to(node.term):
-                        res = x
-                        break
+    for assump in node.assumptions():
+        if assump.term.equals_to(node.term):
+            ApplyExact(env, node, assump, 0)
+            return
 
-        if res is not None: break
-        n = n.parent
-
-    if res is None:
-        raise Exception("Goal {node.term} not found among assumptions")
-    ApplyExact(env, node, res, 0)
+    raise Exception("Goal {node.term} not found among assumptions")
+    
