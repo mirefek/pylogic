@@ -581,6 +581,7 @@ x = exists_intro(PRED = "x : !to_bool1(PRED(x))")
 x = nimpl_symm(x)
 x = x.rw(co.forall.def_thm.symm)
 forall_elim_full = x
+print("forall_elim_full", forall_elim_full)
 
 x = exists_elim(PRED = "x : !to_bool1(PRED(x))")
 x = impln_symm(x)

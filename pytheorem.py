@@ -353,7 +353,7 @@ class Theorem:
     def alpha_equiv_exchange(self, term):
         return self._env.basic_impl.refl(term).modus_ponens_basic(self)
     
-    def generalize(self, *vs, fix_bnames = True, full = False):
+    def generalize(self, *vs, fix_bnames = True, **kwargs):
         vs = [
             v if not isinstance(v, str) else self.get_var(v)
             for v in vs
@@ -368,7 +368,7 @@ class Theorem:
         })
         for v in reversed(vs):
             if isinstance(v, str): v = self.get_var(v)
-            res = self._env.generalize(res, v, full = full)
+            res = self._env.generalize(res, v, **kwargs)
             res_term = Term(self._env.constants.forall, (res.term.args[0],), ((v.name,),))
             if v.name != res.term.bound_names[0][0]: correct_bnames = False
         if not correct_bnames and fix_bnames:
