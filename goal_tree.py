@@ -1,4 +1,5 @@
 from term import Term
+from pytheorem import Theorem
 
 class GoalTreeNode:
     def __init__(self, term, parent = None, tactic_output = None):
@@ -24,6 +25,17 @@ class GoalTreeNode:
             ))
             #assert x.term.equals_to(x.closed_with.term), x.tactic
             x = x.parent
+
+    def assumptions(self):
+        n = self
+        while n:
+            if isinstance(n.tactic_output, Theorem):
+                yield n.tactic_output
+            elif isinstance(n.tactic_output, (tuple, list)):
+                for x in n.tactic_output:
+                    if isintance(x, Theorem):
+                        yield x
+            n = n.parent
 
     def __str__(self):
         return "Goal: "+self.term.to_str()
