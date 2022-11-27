@@ -205,11 +205,11 @@ class HigherToFirstOrder:
             return term
         f = term.f
         if f == self.config.c_to_bool:
-            res = term_to_fof(term.args[0], 0)
+            res = self.term_to_fof(term.args[0], 0)
             self.term_to_fof_cache[term, ctx] = res
             return res
         if f == self.config.c_to_bool1:
-            res = term_to_fof(term.args[0], 1)
+            res = self.term_to_fof(term.args[0], 1)
             self.term_to_fof_cache[term, ctx] = res
             return res
 
@@ -315,7 +315,7 @@ class HigherToFirstOrder:
         else:
             def_data = None
             final_subst.update({
-                key_var : body_var.to_term()
+                key_var : final_subst.get(body_var, body_var.to_term())
                 for key_var, body_var in zip(def_head.get_ordered_free_vars(), body_vs)
             })
 
@@ -601,7 +601,7 @@ class FofHammer(Verifier):
 
         tptp_exporter = FirstOrderToTPTP(self._tptp_config)
         def take_fof_fun(term, metadata):
-            if verbose: print('<-', list(map(str, term.free_vars)), term)
+            if verbose: print('  ->', list(map(str, term.free_vars)), term)
             if metadata is None: thm_label, metadata = "axiom", None
             elif metadata < 0: thm_label, metadata = "conjecture", None
             else: thm_label, metadata = "axiom", metadata
@@ -618,12 +618,12 @@ class FofHammer(Verifier):
                 frozen_vs.add(assump.free_vars)
             frozen_term = self.var_to_const(axiom.term, frozen_vs, var_to_const_d)
             if verbose:
-                print("  ->", list(map(str, frozen_term.free_vars)), frozen_term)
+                print("<-", list(map(str, frozen_term.free_vars)), frozen_term)
             to_fof.add_statement(frozen_term, i)
 
         frozen_goal = self.var_to_const(goal, goal.free_vars, var_to_const_d)
         if verbose:
-            print("  ->", list(map(str, frozen_goal.free_vars)), frozen_goal)
+            print("<-", list(map(str, frozen_goal.free_vars)), frozen_goal)
         to_fof.add_statement(frozen_goal, -1)
 
         if verbose:
@@ -674,49 +674,12 @@ class FofHammer(Verifier):
 if __name__ == "__main__":
     from logic_env import LogicEnv
     env = LogicEnv()
-    solver_cmd_vampire = [
-        "/home/mirek/formal-math/vampire_z3_rel_static_HEAD_6295",
-        "--output_axiom_names", "on", "--proof", "tptp", # output format that I can parse
-        "-t", "5", # time limit
-    ]
-    solver_cmd_e = [
-        "./eprover",
-        "-p", # output format that I can parse
-    ]
-    hammer = FofHammer(
-        core = env.core,
-        constants = env.parser.name_signature_to_const,
-        solver_cmd = solver_cmd_vampire
-    )
-    ax = env.axioms
-    co = env.constants
+    config = HigherToFirstOrderConfig(env.parser.name_signature_to_const)
+    exporter = HigherToFirstOrder(config, lambda t,m: print(t,m))
     tt = env.to_term
 
-    req_true = hammer.run(tt("(require true; A) = A"), [
-        ax.if_true.core_thm,
-        co._require.def_core_thm
-    ])
-    print(req_true)
-    req_false = hammer.run(tt("(require false; A) = null"), [
-        ax.if_false.core_thm,
-        co._require.def_core_thm
-    ])
-    print(req_false)
-
-    exists_uq_is_bool = hammer.run(tt("exists_uq(x : PRED(x)) is_bool"), [
-        co._is_bool.def_core_thm,
-        co.exists_uq.def_core_thm,
-    ])
-    print(exists_uq_is_bool)
-
-    hammer.add_predicate(exists_uq_is_bool)
-
-    let_is_take = hammer.run(tt("let(A, x:BODY(x)) = take(x : require x = A; BODY(x))"), [
-        req_true, req_false,
-        ax.example_universal.core_thm,
-        co.exists_uq.def_core_thm,
-        co.unique.def_core_thm,
-        co.take.def_core_thm,
-        co.let.def_core_thm,
-    ])
-    print(let_is_take)
+    #exporter.add_statement(tt("forall(A : map_set(x : require x in A; x, B))"), 42)
+    #exporter.add_statement(tt("map_set(x : require x in A; x, B)"), 5)
+    #exporter.add_statement(tt("forall(A : map_set(x : require x in A; x, B))"), 42)
+    exporter.add_statement("(PRED(X) && forall(y : PRED(y)  => y = X) => X = unique(x : PRED(x))) && (!exists(x : PRED(x)) || exists(x : exists(y : x != y && PRED(x) && PRED(y))) => unique(x : PRED(X)) = null)")
+    exporter.add_statement("")
