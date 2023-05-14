@@ -1,4 +1,4 @@
-from term import Term, TermConstant, TermVariable
+from term import Term, TermApp, BVar, TermConstant, TermVariable
 
 class Unification:
     # frozen = None -- nothing frozen
@@ -206,14 +206,14 @@ class Unification:
         v1,side1v = self._var_copy_to_ori.get((v1,side1), (v1,side1))
         #print("Assign:", v1, side1v, t2, side2)
         if t1.f.arity == 0:
-            if t2.debruin_height > 0: return False
+            if t2.debruijn_height > 0: return False
             t2_abstract = t2
-        elif any(not x.is_bvar for x in t1.args): return None
-        elif t2.debruin_height == 0:
+        elif any(isinstance(x, TermApp) for x in t1.args): return None
+        elif t2.debruijn_height == 0:
             t2_abstract = t2
         else:
             t1_vars = [
-                arg.debruin_height for arg in t1.args
+                arg.debruijn_height for arg in t1.args
             ]
             args = [None]*(max(t1_vars)+1)
             duplicite_variable = False
@@ -223,8 +223,8 @@ class Unification:
                     duplicite_variable = True
                     break
                 else:
-                    args[t1v] = Term(v1.arity-i)
-                    if t1v != args[t1v].debruin_height-1:
+                    args[t1v] = BVar(v1.arity-i)
+                    if t1v != args[t1v].debruijn_height-1:
                         arg_changed = True
             for tv2 in t2.bound_vars:
                 if args[tv2] is None: return False # missing variable
@@ -293,7 +293,7 @@ class Unification:
         assigned = self._var_assignments.get(var_key, None)
         if assigned is None: return None
         abstract_term, res_side = assigned
-        if abstract_term.debruin_height == 0:
+        if abstract_term.debruijn_height == 0:
             res_term = abstract_term
         else:
             assert term.f.arity > 0
@@ -332,9 +332,9 @@ class Unification:
         as2 = bool(self._is_assignable(t2.f, side2))
         if not (as1 or as2): return False
         if not (as1 and as2): return as2
-        if t1.debruin_height != t2.debruin_height:
-            return t1.debruin_height < t2.debruin_height
-        if t1.debruin_height > 0:
+        if t1.debruijn_height != t2.debruijn_height:
+            return t1.debruijn_height < t2.debruijn_height
+        if t1.debruijn_height > 0:
             if len(t1.bound_vars) != len(t2.bound_vars):
                 return len(t1.bound_vars) < len(t2.bound_vars)
         if t1.f.arity != t2.f.arity:

@@ -113,46 +113,18 @@ class CalculationNumbers:
         for i in range(k):
             res = res * (n-i) // (i+1)
         return MathNumber(res)
+    def calc_catalan(self, n):
+        if not isinstance(n, MathNumber) or n.x % 1 or n.x < 0: return None
+        n = int(n.x)
+        res = 1
+        for k in range(n):
+            res *= (2*k+2)*(2*k+1)
+            res //= (k+2)*(k+1)
+        return MathNumber(res)
     def calc__power(self, x, n):
         if not isinstance(x, MathNumber) or x.x % 1: return None
         if not isinstance(n, MathNumber) or n.x % 1 or n.x < 0: return None
         return MathNumber(x.x ** n.x)
-
-    def calc_thibault_cond(self, a,b,c):
-        if not isinstance(a, MathNumber) or a.x % 1: return None
-        if not isinstance(b, MathNumber) or b.x % 1: return None
-        if not isinstance(c, MathNumber) or c.x % 1: return None
-        if a.x <= 0: return b
-        else: return c
-    def calc_2_0_0_thibault_loop(self, f,a,b):
-        if not isinstance(a, MathNumber) or a.x % 1: return None
-        if not isinstance(b, MathNumber) or b.x % 1: return None
-        if a.x <= 0: return b
-        for i in range(1, 1+int(a.x)):
-            b = f(b, MathNumber(i))
-            if b is None: return None
-        return b
-    def calc_2_2_0_0_0_thibault_loop2(self, f,g,a,b,c):
-        if not isinstance(a, MathNumber) or a.x % 1: return None
-        if not isinstance(b, MathNumber) or b.x % 1: return None
-        if not isinstance(c, MathNumber) or c.x % 1: return None
-        if a.x <= 0: return b
-        for _ in range(int(a.x)):
-            b,c = f(b,c), g(b,c)
-            if b is None or c is None: return None
-        return b
-    def calc_2_0_thibault_compr(self, f, a):
-        if not isinstance(a, MathNumber) or a.x % 1: return None
-        if a.x < 0: return None
-        i = a.x
-        m = -1
-        z = MathNumber(0)
-        while i >= 0:
-            m += 1
-            val = f(m, z)
-            if not isinstance(val, MathNumber) or m.x % 1: return None
-            if val <= 0: i -= 1
-        return m
 
 if __name__ == "__main__":
     from parse_term import TermParser
@@ -184,49 +156,4 @@ if __name__ == "__main__":
     print(calculator.calculate(tt("sum(1..5, a:sum(1..a, x : 2*x-1))")))
     print(calculator.calculate(tt("fun_on(0..5, n : fun_on(0..n, k:binom(n,k)))")))
     print(calculator.calculate(tt("forall_in(1..10, n : sum(0..n, k:binom(n,k)) = 2^n)")))
-
-    print(calculator.calculate(tt("""
-fun_on(0..10, x :
-  thibault_loop2(
-    x:y: thibault_loop(
-      x:y: thibault_loop(
-        x:y: (((1 + 2) * (x * y)) // (2 + y)) + x,
-	thibault_loop(
-	  x:y: x - thibault_cond(y - x, y, 0),
-	  2 + (x // (1 + (2 + 2))),
-	  x
-	),
-        thibault_loop2(
-	  x:y: x * y,
-	  x:y: 1 + y,
-	  0 - thibault_loop(
-	    x:y: x - thibault_cond(x, 0, 1 + y),
-	    2 + (x // (1 + (2 + 2))),
-	    x
-	  ),
-	  1,
-	  1 + thibault_loop(
-	    x:y: x - thibault_cond(y - x, y, 0),
-	    2 + (x // (1 + (2 + 2))),
-	    x
-	  )
-	)
-      ) // thibault_loop(
-        x:y: x * y,
-	0 - thibault_loop(
-	  x:y: x - thibault_cond(x, 0, 1 + y),
-	  2 + (x // (1 + (2 + 2))),
-	  x
-	),
-	1
-      ),
-      1,
-      y
-    ) - x,
-    x:y: 1 + y,
-    x,
-    1,
-    1 + (((x * x) + x) // 2)
-  )
-)
-""")))
+    print(calculator.calculate(tt("fun_on(0..10, n:catalan(n))")))

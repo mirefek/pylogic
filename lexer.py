@@ -7,6 +7,7 @@ def show_in_line(line, start, end = None, lineno = None):
         line_desc = "{}:".format(lineno)
         start += len(line_desc)
         line = line_desc+line
+    if line.endswith('\n'): line = line[:-1]
     print(line)
     print(' '*start+'^'*l)
 

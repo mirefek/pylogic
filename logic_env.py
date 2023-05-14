@@ -117,7 +117,7 @@ class ConstantSet:
         return self._constant_signature_to_const[name, signature]
 
 # TESTS
-            
+
 if __name__ == "__main__":
     env = LogicEnv()
 

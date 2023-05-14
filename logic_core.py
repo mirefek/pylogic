@@ -1,4 +1,4 @@
-from term import Term, TermVariable, TermConstant
+from term import Term, TermApp, BVar, TermVariable, TermConstant
 
 class AssumptionLabel:
     def __init__(self, name="?label"):
@@ -75,7 +75,9 @@ class CoreTheorem:
     def specialize(self, subst):
         for v,t in subst.items():
             assert isinstance(v, TermVariable)
-            if not (t.debruin_height <= v.arity):
+            if not (t.debruijn_height <= v.arity):
+                print()
+                print(self)
                 print(v, ":= ", t)
                 raise Exception("Cannot substitute a term with variables bound above")
         assumptions = {
@@ -127,7 +129,7 @@ class CoreTheorem:
                 del assumptions[label]
         term = self._term
         for label in reversed(labels):
-            term = Term(self._core.implication, (self.assumption(label), term))
+            term = TermApp(self._core.implication, (self.assumption(label), term))
         origin = "labels_to_impl", tuple(labels)
         return self._core._make_thm(assumptions, term, origin, self._free_vars)
 
@@ -182,13 +184,13 @@ class LogicCore:
             raise Exception(f"var_list doesn't cover all the free variables: {missing}")
         f = DefinedConstant(tuple(v.arity for v in var_list), name = name)
         var_list_t = tuple(
-            Term(v, tuple(Term(i) for i in range(v.arity,0,-1)))
+            TermApp(v, tuple(BVar(i) for i in range(v.arity,0,-1)))
             for v in var_list
         )
-        def_term = Term(
+        def_term = TermApp(
             self.equality,
             (
-                Term(f, var_list_t, bound_names = bound_names),
+                TermApp(f, var_list_t, bound_names = bound_names),
                 body,
             )
         )

@@ -1,11 +1,11 @@
 from weakref import WeakValueDictionary
-from term import Term
+from term import Term, BVar
 
 def term_to_instr_list_aux(term, cache, res_list):
     res = cache.get(term, None)
     if res is not None: return res
-    if term.is_bvar:
-        value = (term.debruin_height,)
+    if isinstance(term, BVar):
+        value = (term.debruijn_height,)
     else:
         value = (term.f,)+tuple(
             term_to_instr_list_aux(arg, cache, res_list)
@@ -38,8 +38,8 @@ class TermCache:
     def share(self, term):
         res = self._term_to_res.get(term, None)
         if res is not None: return res
-        if term.is_bvar:
-            res = self._bvar_to_res.setdefault(term.debruin_height, term)
+        if isinstance(term, BVar):
+            res = self._bvar_to_res.setdefault(term.debruijn_height, term)
         else:
             args = tuple(
                 self.share(arg) for arg in term.args
@@ -48,7 +48,7 @@ class TermCache:
             if res is None:
                 if args == term.args: res = term
                 else:
-                    res = Term(term.f, args, term.bound_names)
+                    res = TermApp(term.f, args, term.bound_names)
                     self._term_to_res[res] = res
                 self._f_args_res[term.f, args] = res
 

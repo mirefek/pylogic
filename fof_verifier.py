@@ -2,7 +2,7 @@ import re
 import itertools
 from collections import deque
 from weakref import WeakValueDictionary, WeakSet
-from term import Term, TermVariable, TermConstant, get_unused_name
+from term import Term, TermApp, BVar, TermVariable, TermConstant, get_unused_name
 from share_term import TermCache
 import subprocess
 from logic_core import Verifier, CoreTheorem
@@ -164,16 +164,16 @@ class HigherToFirstOrder:
         # ctx = 0 -- bool
         # ctx = 1 -- under forall
         # ctx = 2 -- term
-        term_is_bool = not term.is_bvar and term.f in self.config.out_bool
-        term_can_be_bool = term_is_bool or (not term.is_bvar and (
+        term_is_bool = isinstance(term, TermApp) and term.f in self.config.out_bool
+        term_can_be_bool = term_is_bool or (isinstance(term, TermApp) and (
             term.f in (self.config.c_require, self.config.c_true, self.config.c_false)
         ))
         if ctx == 0 and not term_can_be_bool:
-            res = Term(self.config.c_to_bool, (self.term_to_fof(term, 2),))
+            res = TermApp(self.config.c_to_bool, (self.term_to_fof(term, 2),))
             self.term_to_fof_cache[term, ctx] = res
             return res
         elif ctx == 1 and not term_can_be_bool:
-            res = Term(self.config.c_to_bool1, (self.term_to_fof(term, 2),))
+            res = TermApp(self.config.c_to_bool1, (self.term_to_fof(term, 2),))
             self.term_to_fof_cache[term, ctx] = res
             return res
 
@@ -200,7 +200,7 @@ class HigherToFirstOrder:
             self.term_to_fof_cache[term, ctx] = res
             return res
 
-        if term.is_bvar:
+        if isinstance(term, BVar):
             self.term_to_fof_cache[term, ctx] = term
             return term
         f = term.f
@@ -224,7 +224,7 @@ class HigherToFirstOrder:
 
         if f == self.config.c_eq:
             compared_bool = all(
-                not x.is_bvar and (
+                isinstance(x, TermApp) and (
                     x.f in self.config.out_bool or
                     x.f in (self.config.c_true, self.config.c_false)
                 )
@@ -237,14 +237,14 @@ class HigherToFirstOrder:
         args = []
         for numb, arg, ictx in zip(f.signature, term.args, inner_ctx):
             if numb > 0 and ictx == 2:
-                if not arg.is_bvar and arg.f in self.config.out_bool:
+                if isinstance(arg, TermApp) and arg.f in self.config.out_bool:
                     ictx = 0
             args.append(self.term_to_fof(arg, ictx))
 
         if all(x == 0 for x in f.signature) or f in (self.config.c_forall, self.config.c_exists):
             # the most standard case
 
-            res = Term(f, args, term.bound_names)
+            res = TermApp(f, args, term.bound_names)
             self.term_to_fof_cache[term, ctx] = res
             return res
 
@@ -260,12 +260,12 @@ class HigherToFirstOrder:
                 arg = self.replace_with_defined(arg)
                 # for storing definition, replace arg.bvars > numb
                 # with free variables
-                if arg.debruin_height > numb:
+                if arg.debruijn_height > numb:
                     bound_subst = [None] + [
-                        Term(i) for i in range(1,numb+1)
+                        BVar(i) for i in range(1,numb+1)
                     ] + [
                         TermVariable(0).to_term()
-                        for _ in range(numb+1, arg.debruin_height+1)
+                        for _ in range(numb+1, arg.debruijn_height+1)
                     ]
                     arg2 = arg.substitute_bvars(bound_subst, natural_order = False)
                 else:
@@ -275,7 +275,7 @@ class HigherToFirstOrder:
                 defined_binder_args.append(arg)
 
         def_data, res = self.replace_with_defined_raw(
-            Term(f, defined_binder_args, term.bound_names),
+            TermApp(f, defined_binder_args, term.bound_names),
             f.name,
             "binder",
         )
@@ -292,11 +292,11 @@ class HigherToFirstOrder:
 
         if not term.is_closed:
             final_subst = dict()
-            bound_subst = [None]*(term.debruin_height+1)
+            bound_subst = [None]*(term.debruijn_height+1)
             for i in term.bound_vars:
                 v = TermVariable(0)
                 bound_subst[i] = v.to_term()
-                final_subst[v] = Term(i)
+                final_subst[v] = BVar(i)
             def_body = term.substitute_bvars(bound_subst, natural_order = False)
         else:
             def_body = term
@@ -325,11 +325,11 @@ class HigherToFirstOrder:
         return def_data, replacement
 
     def replace_with_defined(self, term):
-        if term.is_bvar: return term
+        if isinstance(term, BVar): return term
 
         # if term is simple, no replacement
         if term.is_const and all(x == 0 for x in term.f.signature):
-            if all(arg.is_bvar or (isinstance(arg.f, TermVariable) and arg.f.arity == 0)
+            if all(isinstance(arg, BVar) or (isinstance(arg.f, TermVariable) and arg.f.arity == 0)
                    for arg in term.args):
                 if len(term.bound_vars) + len(term.free_vars) == len(term.args):
                     return term
@@ -440,7 +440,7 @@ class FirstOrderToTPTP:
         return f"fof('{thm_name}', {thm_label}, {formula_str}).\n"
 
     def _formula_to_str(self, formula):
-        assert not formula.is_bvar
+        assert isinstance(formula, TermApp)
         if formula.f in self.config.quantifiers:
             [[bname]] = formula.bound_names
             bname = self._get_var_name(bname)
@@ -471,8 +471,8 @@ class FirstOrderToTPTP:
             else: return pred_name + '(' + ','.join(args) + ')'
 
     def _term_to_str(self, term):
-        if term.is_bvar:
-            return self.bound_names[-term.debruin_height]
+        if isinstance(term, BVar):
+            return self.bound_names[-term.debruijn_height]
         elif term.is_free_var:
             return self.var_to_name[term.f]
         else:

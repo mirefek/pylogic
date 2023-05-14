@@ -1,5 +1,5 @@
 from logic_core import AssumptionLabel, CoreTheorem
-from term import Term, TermVariable, compose_substitutions, next_names
+from term import Term, TermApp, BVar, TermVariable, compose_substitutions, next_names
 from unification import Unification
 
 class Resolver:
@@ -363,13 +363,13 @@ class Theorem:
         res = self
         correct_bnames = True
         res_term = self.term.substitute_free({
-            v : Term(i)
+            v : BVar(i)
             for i,v in zip(range(len(vs),0,-1), vs)
         })
         for v in reversed(vs):
             if isinstance(v, str): v = self.get_var(v)
             res = self._env.generalize(res, v, **kwargs)
-            res_term = Term(self._env.constants.forall, (res.term.args[0],), ((v.name,),))
+            res_term = TermApp(self._env.constants.forall, (res.term.args[0],), ((v.name,),))
             if v.name != res.term.bound_names[0][0]: correct_bnames = False
         if not correct_bnames and fix_bnames:
             res = res.alpha_equiv_exchange(res_term)

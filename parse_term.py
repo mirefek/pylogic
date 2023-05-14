@@ -74,11 +74,11 @@ class TermParser:
                 return self.int_to_term(int(token.name))
         bvi = self.local_context.get(token.name, None)
         if bvi is not None:
-            return Term(self.depth - bvi)
+            return BVar(self.depth - bvi)
         else:
             x = self._get_const_or_var(token.name, ())
             assert x is not None
-            return Term(x, ())
+            return TermApp(x, ())
     def _get_string(self, tree):
         if tree.rule != self.syntax_parser._rule_atom: return None
         return tree.args[0].name
@@ -119,7 +119,7 @@ class TermParser:
         self.introduce_constant = introduce_constant
         f = self._get_const_or_var(fun, signature)
         self.introduce_constant = False
-        res = Term(f, term_args, bound_names = bound_names)
+        res = TermApp(f, term_args, bound_names = bound_names)
         return res
 
     def get_var(self, name, arity):
@@ -187,8 +187,8 @@ class TermParser:
             assert isinstance(v, TermVariable)
             assert v not in res_s
             for i, v_arg in enumerate(arg.args):
-                assert v_arg.is_bvar
-                assert v_arg.debruin_height == v.arity-i
+                assert isinstance(v_arg, BVar)
+                assert v_arg.debruijn_height == v.arity-i
             res_s.add(v)
             res.append(v)
         return res
@@ -363,15 +363,15 @@ class ParseTermState:
             f = self.parser.name_signature_to_const[f, (0,)*len(arg_is)]
             if syntax_rule.accepts_modified:
                 def semantics(*args):
-                    res = Term(f, tuple(
+                    res = TermApp(f, tuple(
                         self.parser.tree_to_term(args[i]) for i in arg_is
                     ))
                     if args[1].t == "NEG":
-                        res = Term(self.parser.neg_function, (res,))
+                        res = TermApp(self.parser.neg_function, (res,))
                     return res
             else:
                 def semantics(*args):
-                    return Term(f, tuple(
+                    return TermApp(f, tuple(
                         self.parser.tree_to_term(args[i]) for i in arg_is
                     ))
 

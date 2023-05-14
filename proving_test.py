@@ -1,6 +1,6 @@
 from logic_env import LogicEnv
 from tactics import apply_spec, Intros, PatternLookupGoal, ApplyExact, BasicTactic
-from term import Term, TermVariable, get_unused_name
+from term import Term, BVar, TermApp, TermVariable, get_unused_name
 from logic_core import AssumptionLabel
 from pytheorem import Theorem, Resolver
 from pattern_lookup import PatternLookupRewrite
@@ -368,9 +368,9 @@ def prove_autoconvert_by_definition(constant, *ii):
     for i in ii:
         header, _ = env.split_eq(constant.def_thm.term)
         args = list(header.args)
-        args[i] = Term(co.to_bool, (args[i],))
-        header2 = Term(constant, args)
-        goal = Term(co._eq, (header, header2))
+        args[i] = TermApp(co.to_bool, (args[i],))
+        header2 = TermApp(constant, args)
+        goal = TermApp(co._eq, (header, header2))
         with g.goal(goal):
             g.rw(constant, position = [0])
             g.rw(constant, position = [1])
@@ -607,10 +607,10 @@ def generalize(thm, v, full = False):
     if full:
         assert pred.f == co.to_bool1
         pred = pred.args[0]
-    pred = pred.substitute_free({ v : Term(1) })
-    x = Term(co.to_bool1, (pred,))
-    x = Term(co._neg, (x,))
-    x = Term(co.example, (x,), (['x'],))
+    pred = pred.substitute_free({ v : BVar(1) })
+    x = TermApp(co.to_bool1, (pred,))
+    x = TermApp(co._neg, (x,))
+    x = TermApp(co.example, (x,), (['x'],))
     example = x
     thm = thm.specialize({ v : example })
     if full:
@@ -687,13 +687,13 @@ def prove_extensionality_by_definition(constant, index = None):
     args1 = [v.to_term() for v in vs]
     args2 = list(args1)
     args2[index] = BODY2.to_term()
-    assump = Term(env.core.equality, (args1[index], args2[index]))
+    assump = TermApp(env.core.equality, (args1[index], args2[index]))
     for bname in reversed(bound_names_main):
-        assump = Term(co.forall, (assump,), bound_names = ((bname,),))
-    lhs = Term(constant, args1, bound_names = bound_names)
-    rhs = Term(constant, args2, bound_names = bound_names)
-    main_eq = Term(env.core.equality, (lhs, rhs))
-    ext_goal = Term(env.core.implication, (assump, main_eq))
+        assump = TermApp(co.forall, (assump,), bound_names = ((bname,),))
+    lhs = TermApp(constant, args1, bound_names = bound_names)
+    rhs = TermApp(constant, args2, bound_names = bound_names)
+    main_eq = TermApp(env.core.equality, (lhs, rhs))
+    ext_goal = TermApp(env.core.implication, (assump, main_eq))
     with g.goal(ext_goal):
         a = g.intro()
         g.rw(constant, position=[0]).rw(constant, position=[1])
@@ -811,7 +811,7 @@ class IntroVar(BasicTactic):
             v = self.env.get_locally_fresh_var(v, set(x.name for x in self.goal.free_vars))
         self.v = v
         subgoal = self.goal.args[0].substitute_bvars([v.to_term()])
-        if full: subgoal = Term(co.to_bool1, (subgoal,))
+        if full: subgoal = TermApp(co.to_bool1, (subgoal,))
         return [subgoal]
     def build_thm(self, thm):
         return thm.generalize(self.v, full = self.full)
@@ -1003,6 +1003,21 @@ env.rewriter.add_extensionality(axiom.set_ext)
 env.rewriter.add_extensionality(axiom.fun_ext)
 
 def_in_set_eq = equiv_is_eq(axiom.def_in_set)
+
+# x = env.basic_impl._impl_refl("label", X = "X in A")
+# x = axiom.only_in_set(x)
+# print(x)
+# exit()
+
+# gg = g.goal("X in A => X is_sane")
+# gg.__enter__()
+# x_in_a = g.intro()
+# print(x_in_a)
+# print(x_in_a.core_thm)
+# print(g.current_goal)
+# gg.__exit__(None, None, None)
+
+# exit()
 
 with g.goal("X in A => X is_sane"):
     x_in_a = g.intro()
@@ -1591,10 +1606,20 @@ with g.goal("""
     bij is_injective && domain(bij) = domain(f) && image(bij) = domain(g)
   )
 """):
+# DEMO 1
+#    pass
+#if False:
     cantor_bernstein_statement = g.current_goal.term
     f_inj, g_inj, f_into, g_into = g.intros()
+
     f_fun = injective_is_fun(f_inj)
     g_fun = injective_is_fun(g_inj)
+# DEMO 2
+#    print("Statement:", cantor_bernstein_statement)
+#    print("f_inj = {", f_inj, "}")
+#    print("g_inj = {", g_inj, "}")
+#    print("f_fun = {", f_fun, "}")
+#if False:
 
     s_def = local_def("""S = set(x :
        forall(Sc :
@@ -1603,13 +1628,18 @@ with g.goal("""
          x in Sc
     ))
     """)
+    # DEMO 4
+    #print("s_def = {", s_def, "}")
     with g.goal("X in S => X in domain(f)"):
         xs = g.intro()
         x_sane, x = axiom.def_in_set(xs.rw(s_def)).split()
         x = forall_elim(x, X = "domain(f)")
         x = x(setdiff_is_subset(domain_is_set(f_fun), image_is_set(g_fun)))
         g.app(x)
-        x = g.introv('X2').intro()
+    #if False:
+        g.introv('X2')
+    #if False:
+        x = g.intro()
         g.app(subset_to_in_impl(g_into)).app(in_image_intro(0, axiom.eq_refl))
         g.app(in_domain_elim).app(subset_to_in_impl(f_into))
         g.exact(in_image_intro(in_domain_elim(x), axiom.eq_refl))
@@ -1694,6 +1724,9 @@ with g.goal("""
                 ynn = sane_to_not_null(y_sane)
                 y = in_image_elim(y)
                 y_bx = get_example(y, 'X')
+                # DEMO 3
+                #print("y = {", y, "}")
+                #print("y_bx = {", y_bx, "}")
                 y_bx = y_bx.rw(bij_def)
                 y_bx = y_bx.rw(def_apply_fun_nn(ynn.rw(y_bx)))
                 xs = g.cases("X in S")

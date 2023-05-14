@@ -1,4 +1,4 @@
-from term import TermConstant, TermVariable, Term
+from term import TermConstant, TermVariable, Term, TermApp, BVar
 from logic_core import Verifier
 from share_term import term_to_instr_list
 import inspect
@@ -51,7 +51,7 @@ class CalcTerm:
 
 class CalcBvar(CalcTerm):
     def __init__(self, index):
-        self.index = index-1 # default debruin indices are from 1, here from 0
+        self.index = index-1 # default debruijn indices are from 1, here from 0
         assert self.index >= 0
         super().__init__(1 << self.index)
     def evaluate_raw(self, bvar_values):
@@ -89,7 +89,7 @@ class Calculator(Verifier):
         assert isinstance(termfun, TermConstant)
         self._interpretation[termfun] = python_fun
         if termfun.arity == 0:
-            self._const_to_term[python_fun()] = Term(termfun, ())
+            self._const_to_term[python_fun()] = TermApp(termfun, ())
 
     def accept_types(self, *ts):
         if self.core._strict_mode:
@@ -117,7 +117,7 @@ class Calculator(Verifier):
             return self._const_to_term[value]
         assert self.is_admissible_value(value), value
         f = TermConstant((), self.get_value_name(value))
-        term = Term(f, ())
+        term = TermApp(f, ())
         self._interpretation[f] = lambda : value
         self._const_to_term[value] = term
         return term
@@ -151,7 +151,7 @@ class Calculator(Verifier):
             else: raise
 
         res = self.get_value_term(val)
-        calc_term = Term(self.core.equality, (term, res))
+        calc_term = TermApp(self.core.equality, (term, res))
         origin = term.f
         return self._make_thm(dict(), calc_term, origin)
 

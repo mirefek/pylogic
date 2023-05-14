@@ -1,11 +1,11 @@
-from term import Term, TermFunction
+from term import Term, TermApp, TermFunction
 
 class AssumptionRearrangement:
     def __init__(self, logic, basic_nmp, basic_ada):
         self.logic = logic
         self._assumption_vars = []
-        self._X = Term(TermFunction((), True, "_X"))
-        self._Y = Term(TermFunction((), True, "_Y"))
+        self._X = TermApp(TermFunction((), True, "_X"))
+        self._Y = TermApp(TermFunction((), True, "_Y"))
         self._nmps = [ # (... => (X => Y)) => (... => X) => (... => Y)
             self._prepare_basic_nmp(basic_nmp)
         ]
@@ -83,7 +83,7 @@ class AssumptionRearrangement:
     def _A(self, i):
         while i >= len(self._assumption_vars):
             self._assumption_vars.append(
-                Term(TermFunction((), True, f"_A{len(self._assumption_vars)}"))
+                TermApp(TermFunction((), True, f"_A{len(self._assumption_vars)}"))
             )
         return self._assumption_vars[i]
 
@@ -274,7 +274,7 @@ class AssumptionRearrangement:
             return x
 
     def _impl(self, A, B):
-        return Term(self.logic.implication, (A, B))
+        return TermApp(self.logic.implication, (A, B))
 
     # checking the right form of basic axioms + renaming their variables
 

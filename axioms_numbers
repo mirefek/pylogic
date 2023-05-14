@@ -150,6 +150,7 @@ Definition prod(A, x : BODY(x)) := set_aggreg(A, 1, x:y: x*BODY(y))
 Definition factorial(n) := require n in nats; prod(1..n, x:x)
 Definition binom(n,k) := require n in nats; require k in ints;
   try factorial(n) * factorial(k-n) / factorial(k) else 0
+Definition catalan(n) := binom(2*n, n) / (n+1)
 Definition _power(x,n) := require n in nats; prod(1..n, _:x)
 
 Notation _power   _ ^ _   INSIDE *
@@ -162,39 +163,3 @@ Definition _is_increasing(f) :=
   ))
 
 Notation _is_increasing    _ is_increasing     PRECEDENCE =
-
-# Functions used by Thibault Gauthier
-# in "Learning Program Synthesis for Integer Sequences from Scratch"
-# https://arxiv.org/pdf/2202.11908.pdf
-
-Definition thibault_cond(a,b,c) :=
-  require a in ints && b in ints && c in ints;
-  if a <= 0; b else c
-
-Definition thibault_loop(x:y:f(x,y),a,b) :=
-  require a in ints && b in ints;
-  if a <= 0; b
-  else take(u :
-    require u[0] = b && forall_in(1..a, n : u[n] = f(u[n-1],n));
-    u[a]
-  )
-
-Definition thibault_loop2(x:y:f(x,y),x:y:g(x,y),a,b,c) :=
-  require a in ints && b in ints && c in ints;
-  if a <= 0; b
-  else take2(u:v:
-    require u[0] = b && forall_in(1..a, n : u[n] = f(u[n-1],v[n-1]));
-    require v[0] = c && forall_in(1..a, n : v[n] = g(u[n-1],v[n-1]));
-    require v[a] in ints;
-    u[a]
-  )
-
-Definition thibault_compr(x:y:f(x,y), a) :=
-  require a in nats;
-  take(ms :
-    require domain(ms) = 0 .. a;
-    require image(ms) = 0 .. ms[a] & set(m : f(m,0) <= 0);
-    require ms is_increasing;
-    require forall_in(0 .. ms[a], m : f(m,0) in ints);
-    ms[a]
-  )

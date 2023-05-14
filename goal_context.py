@@ -78,7 +78,7 @@ class GoalEnv:
                 if goal_term.equals_to(node.term): break
             else:
                 print("Claimed: ", goal_term)
-                tree.print_goals()
+                self.current_ctx.tree.print_goals()
                 raise Exception("Subgoal does not match any of the current goals")
         if not goal_term.equals_to(node.term):
             print("Current", node)
