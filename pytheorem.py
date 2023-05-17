@@ -316,7 +316,7 @@ class Theorem:
                 if renaming1: core_thm = core_thm.relabel(renaming1)
                 if renaming2: other_thm = other_thm.relabel(renaming2)
 
-        core_thm = self.core_thm.modus_ponens(other_thm)
+        core_thm = core_thm.modus_ponens(other_thm)
         if not self.resolvers:
             resolvers = other.resolvers
         elif not other.resolvers:

@@ -3,6 +3,7 @@ from logic_core import AssumptionLabel, DefinedConstant
 from pattern_lookup import PatternLookupRewrite
 from pytheorem import Theorem
 from unification import Unification
+from calculator import Calculator
 
 class RootRewriter:
     def try_rw(self, term):
@@ -75,6 +76,18 @@ class RootRewriterUnfold(RootRewriter):
         }
         return definition.specialize(subst)
 
+class RootRewriterCalc(RootRewriter):
+    def __init__(self, env, calculator):
+        self.env = env
+        self.calculator = calculator
+    def try_rw(self, term):
+        if not term.is_closed or term.free_vars: return None
+        if not term.args: return None # already simplfied
+        core_thm = self.calculator.calculate(term)
+        if core_thm is None: return None
+        thm = Theorem(self.env, core_thm)
+        return thm
+
 class Rewriter:
     def __init__(self, eq_refl, eq_cong): # X = Y => PRED(X) => PRED(Y)
         self._env = eq_cong._env
@@ -135,8 +148,8 @@ class Rewriter:
         assert BODY1 in vs, (BODY1, a)
         index = vs.index(BODY1)
         assert all(
-            isinstance(v, TermVariable) and v.arity == 0
-            for i,v in enumerate(vs)
+            isinstance(arg.f, TermVariable) and arg.equals_to(arg.f.to_term())
+            for i,arg in enumerate(a.args)
             if i != index
         ), a
         assert all(
@@ -187,6 +200,8 @@ class Rewriter:
                 cur_rw = RootRewriterSingle(arg)
             elif isinstance(arg, (tuple, list)):
                 cur_rw = self.to_root_rewriter(*arg)
+            elif isinstance(arg, Calculator):
+                cur_rw = RootRewriterCalc(self._env, arg)
             elif isinstance(arg, TermConstant):
                 consts.append(arg)
                 cur_rw = None
@@ -208,6 +223,9 @@ class Rewriter:
         arg = args[index]
         local_vars = []
         extensionality = self._extensionality.get((const,index), None)
+        if extensionality is None and const.signature[index]:
+            print(f"Warning: missing extensionality theorem for {const}, {index}")
+            return None
         if extensionality is not None:
             local_vars = [
                 TermVariable(0, name = name.upper())
@@ -221,7 +239,7 @@ class Rewriter:
         arg_eq, rwt = arg_eq_rwt
         if extensionality is not None:
             eq_vars = arg_eq.free_vars
-            if any(v in eq_vars for v in local_vars):
+            if True or any(v in eq_vars for v in local_vars):
                 env = self._env
                 arg_eq = self.raise_eq(arg_eq, rwt)
                 ext_thm, ext_vs, BODY1, BODY2 = extensionality
@@ -250,14 +268,17 @@ class Rewriter:
                     arg_eq = arg_eq.alpha_equiv_exchange(bnames_correction)
                 rwt = BVar(1)
                 arg = arg_eq.term.args[1].args[index]
-            else:
-                subst = dict(zip(
-                    local_vars,
-                    range(len(local_vars), 0, -1)
-                ))
+            else: # TODO: probably doesn't work this way
+                rwt = rwt.substitute_bvars([BVar(len(local_vars)+1)])
+                subst = {
+                    v : BVar(i)
+                    for v,i in zip(local_vars, range(len(local_vars), 0, -1))
+                }
                 rwt = rwt.substitute_free(subst)
                 arg = arg.substitute_free(subst)
         else:
+            if const.signature[index] > 0:
+                rwt = rwt.substitute_bvars([BVar(const.signature[index]+1)])
             args[index] = rwt
             rwt = TermApp(const, args, bound_names)
         args[index] = arg
@@ -280,8 +301,10 @@ class Rewriter:
             args_changed = False
             args = list(term.args)
             for i,arg in enumerate(args):
+                term_arg0 = TermApp(term.f, args)
                 arg_res = self._run_on_arg(term.f, i, args, term.bound_names, rule, repeat)
                 if arg_res is None: continue
+                term_arg1 = TermApp(term.f, args)
                 res = self._combine_output(res, *arg_res)
                 args_changed = True
                 if not repeat: break
@@ -290,6 +313,7 @@ class Rewriter:
             if not repeat: break
 
             root_changed = False
+
         return term, res
     def _combine_output(self, res1, eq2, rwt2):
         if res1 is None: return eq2, rwt2

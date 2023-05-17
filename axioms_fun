@@ -30,6 +30,13 @@ Definition update(f,g) := require f is_Fun; require g is_Fun; fun(x : try g[x] e
 Definition fun_on(A, x:BODY(x)) := require A is_Set; fun(x : require x in A; BODY(x))
 Definition empty_fun := fun(x : null)
 
+# set-theoretical axiom
+
+Axiom regularity : A is_Set => A != {} => exists(x : require x in A;
+  (x is_Set => x & A = {}) &&
+  (x is_Fun => image(x) & A = {} && domain(x) & A = {})
+)
+
 Definition _is_injective(f) := f is_Fun &&
   forall(x : require x in domain(f);
   forall(y : require y in domain(f);

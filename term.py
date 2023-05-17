@@ -197,7 +197,7 @@ class TermApp(Term):
         self.debruijn_height = 0
         if bound_names is None:
             self.bound_names = tuple(('?b',)*n for n in f.signature)
-        else: self.bound_names = bound_names
+        else: self.bound_names = tuple(bound_names)
         for arg, numb in zip(args, f.signature):
             assert isinstance(arg, Term)
             self.debruijn_height = max(self.debruijn_height, arg.debruijn_height - numb)

@@ -107,7 +107,7 @@ class CalculationNumbers:
         if not isinstance(k, MathNumber) or k.x % 1: return None
         n = int(n.x)
         k = int(k.x)
-        if k < 0 or k > n: return 0
+        if k < 0 or k > n: return MathNumber(0)
         if n-k < k: k = n-k
         res = 1
         for i in range(k):

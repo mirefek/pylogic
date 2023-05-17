@@ -8,6 +8,7 @@ from rewriter import Rewriter
 from pattern_lookup import PatternLookupImpl
 from goal_context import GoalEnv
 from tactics import Tactics
+from term import BVar, TermApp
 
 class LogicEnv:
     def __init__(self):
@@ -28,6 +29,9 @@ class LogicEnv:
         )
         self.tactics = Tactics(self)
         self.goal_env = GoalEnv(self)
+
+        self.forall_intro_full = None
+        self.forall_intro = None
 
     def add_impl_rule(self, name, *rules):
         rule_set = self.impl_rules.get(name, None)
@@ -79,6 +83,35 @@ class LogicEnv:
         thm = thm.impl_to_labels(label)
         return thm
 
+    def generalize(self, thm, v, full = False):
+        if isinstance(v, str):
+            v = self.parser.get_var(v, 0)
+        pred = thm.term
+        if full:
+            assert pred.f == self.constants.to_bool1
+            pred = pred.args[0]
+        pred = pred.substitute_free({ v : BVar(1) })
+        x = TermApp(self.constants.to_bool1, (pred,))
+        x = TermApp(self.constants._neg, (x,))
+        x = TermApp(self.constants.example, (x,), (['x'],))
+        example = x
+        thm = thm.specialize({ v : example })
+        if full:
+            assert self.forall_intro_full != None
+            x = self.forall_intro_full(PRED = pred)
+        else:
+            assert self.forall_intro != None
+            x = self.forall_intro(PRED = pred)
+        x = x.modus_ponens_basic(thm)
+        return x
+
+    def add_axiom(self, axiom_str):
+        return Theorem(self, self.core.add_axiom(self.to_term(axiom_str), "in_code"))
+
+    def add_generalize_axioms(self): # could we proven but takes too long...
+        self.forall_intro_full = self.add_axiom("to_bool1(PRED(example(x : ! to_bool1(PRED(x))))) => forall(x : PRED(x))")
+        self.forall_intro = self.add_axiom("PRED(example(x : ! to_bool1(PRED(x)))) => forall(x : PRED(x))")
+    
 class AxiomSet:
     def __init__(self, env):
         self._env = env
@@ -101,7 +134,8 @@ class ConstantSet:
         }
         for const in env.parser.consts_by_age:
             if isinstance(const, DefinedConstant):
-                const.def_thm = Theorem(env, const.def_core_thm)
+                if const.def_thm is None:
+                    const.def_thm = Theorem(env, const.def_core_thm)
         self._constant_signature_to_const = env.parser.name_signature_to_const
         self._eq = env.core.equality
         self._impl = env.core.implication

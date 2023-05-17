@@ -600,27 +600,8 @@ forall_elim = forall_elim_full.rw(to_bool1_idemp)
 forall_eq_elim = forall_elim(PRED = "x : BODY1(x) = BODY2(x)")
 forall_forall_elim = forall_elim(PRED = "x : forall(y : PRED(x,y))")
 
-def generalize(thm, v, full = False):
-    if isinstance(v, str):
-        v = env.parser.get_var(v, 0)
-    pred = thm.term
-    if full:
-        assert pred.f == co.to_bool1
-        pred = pred.args[0]
-    pred = pred.substitute_free({ v : BVar(1) })
-    x = TermApp(co.to_bool1, (pred,))
-    x = TermApp(co._neg, (x,))
-    x = TermApp(co.example, (x,), (['x'],))
-    example = x
-    thm = thm.specialize({ v : example })
-    if full:
-        x = forall_intro_full(PRED = pred)
-    else:
-        x = forall_intro(PRED = pred)
-    x = x.modus_ponens_basic(thm)
-    return x
-
-env.generalize = generalize
+env.forall_intro = forall_intro
+env.forall_intro_full = forall_intro_full
 
 with g.goal("forall(x : PRED(x) = PRED2(x)) => example(x : PRED(x)) = example(x : PRED2(x))"):
     assump = g.intro()
@@ -630,7 +611,7 @@ with g.goal("forall(x : PRED(x) = PRED2(x)) => example(x : PRED(x)) = example(x 
         g.app(axiom.example_well_ordered)
         with g.goal("PRED(X) => PRED2(X)"):
             g.exact(assump_eq.to_impl())
-        g.exact(generalize(g.last_proven, 'X'))
+        g.exact(env.generalize(g.last_proven, 'X'))
         g.exact(ex)
     nex = g.get_last_output()
     with g.subgoal():

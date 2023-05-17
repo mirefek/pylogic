@@ -104,6 +104,12 @@ class Calculator(Verifier):
             return value.has_admissible_items(self)
         else: return True
 
+    def get_term_value(self, term, default = None):
+        assert term.f.arity == 0
+        f_val = self._interpretation.get(term.f)
+        if f_val is None: return default
+        return f_val()
+
     def get_value_name(self, value):
         term = self._const_to_term.get(value, None)
         if term is not None: return str(term)
@@ -152,8 +158,7 @@ class Calculator(Verifier):
 
         res = self.get_value_term(val)
         calc_term = TermApp(self.core.equality, (term, res))
-        origin = term.f
-        return self._make_thm(dict(), calc_term, origin)
+        return self._make_thm(dict(), calc_term)
 
     def add_functions(self, constant_dict, *function_modules, prefix = "calc_"):
         for function_module in function_modules:
@@ -174,7 +179,7 @@ class Calculator(Verifier):
                 else:
                     signature = (0,)*arity
                 const = constant_dict[name, signature]
-                self.set_interpretation(const, fun)
+                self.set_interpretation(const, fun)    
 
 class LogicCalculation:
     def calc_true(self): return True
