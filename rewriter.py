@@ -55,7 +55,7 @@ class RootRewriterList(RootRewriter):
     def to_pattern(self):
         pattern = PatternLookupRewrite()
         for rw in self.rewriters:
-            pattern = pattern.union(rw)
+            pattern = pattern.union(rw.to_pattern())
         return pattern
 
 class RootRewriterUnfold(RootRewriter):

@@ -79,7 +79,7 @@ class IntHammer(Verifier):
 
     # we assume a formula without quantifiers, without typing conditions
     # typing conditions will be added to the final theorem
-    def verify(self, formula, debug = False):
+    def verify(self, formula, time_limit = None, debug = False):
         vs = formula.get_ordered_free_vars()
         if any(v.arity > 0 for v in vs):
             if debug:
@@ -115,8 +115,12 @@ class IntHammer(Verifier):
         tptp_str = f"tff('pylogic_int_hammer_problem', conjecture, {quantified_str})."
         if debug: print("TPTP formula:", tptp_str)
 
+        solver_cmd = self._solver_cmd
+        if time_limit is not None:
+            assert isinstance(time_limit, int)
+            solver_cmd = solver_cmd+['-t', str(time_limit)+'s']
         hammer_output = subprocess.run(
-            self._solver_cmd,
+            solver_cmd,
             input = tptp_str.encode(),
             capture_output = True,
         )
@@ -240,14 +244,10 @@ if __name__ == "__main__":
         calculator = calculator
     )
 
-    # vampire struggles with: x
-    # a+b <= (10 + (2 * (x // 34)))
-    # last tried: (26 + (2 * (x // 102)))
-
     problem_str = """
        n >= 0 =>
        x >= (n+1)*n//2 =>
-       n <= (26 + (2 * (x // 100)))
+       n <= (10 + (2 * (x // 36)))
     """
     thm = hammer.verify(parser.parse_str(problem_str), debug = True)
     print(thm)

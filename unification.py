@@ -19,6 +19,7 @@ class Unification:
         self.to_glue.append(((t1,side1),(t2,side2)))
         self._basic_req_log.append((t1,t2,label))
     def print_requirements(self):
+        print("frozen:", self.frozen)
         for t1,t2,label in self._basic_req_log:
             print(label)
             print('*', t1)
@@ -227,7 +228,8 @@ class Unification:
                     if t1v != args[t1v].debruijn_height-1:
                         arg_changed = True
             for tv2 in t2.bound_vars:
-                if args[tv2] is None: return False # missing variable
+                if tv2 >= len(args) or args[tv2] is None:
+                    return False # missing variable
             if duplicite_variable: return None
 
             if not arg_changed: t2_abstract = t2
@@ -348,12 +350,17 @@ if __name__ == "__main__":
     from logic_core import LogicCore
     from parse_term import TermParser
     import traceback
+    from calculator import Calculator
 
     logic = LogicCore()
-    parser = TermParser(logic)
+    calculator = Calculator(logic)
+    calculator.accept_types(int)
+    parser = TermParser(logic, int_to_term = lambda n: calculator.get_value_term(n))
     parser.parse_file("axioms_logic")
     parser.parse_file("axioms_set")
     parser.parse_file("axioms_fun")
+    parser.parse_file("axioms_numbers")
+    parser.parse_file("axioms_thibault")
 
     def get_new_var(v, used_names):
         name = get_unused_name(v.name, used_names)
@@ -434,5 +441,10 @@ if __name__ == "__main__":
     test_unification(
         "domain(f) is_Set",
         "domain(require f is_Fun ; fun(y : unique(x : f [ x ] = y))) is_Set",
+        frozen = ((), None),
+    )
+    test_unification(
+        "loop(A, B, x : y : x + BODY(y))",
+        "loop(A % 2, 5, a : b : a + a)",
         frozen = ((), None),
     )

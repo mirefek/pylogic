@@ -1,5 +1,5 @@
 from weakref import WeakValueDictionary
-from term import Term, BVar
+from term import Term, TermApp, BVar
 
 def term_to_instr_list_aux(term, cache, res_list):
     res = cache.get(term, None)

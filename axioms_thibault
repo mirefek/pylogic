@@ -1,0 +1,179 @@
+
+# Functions used by Thibault Gauthier
+# in "Learning Program Synthesis for Integer Sequences from Scratch"
+# https://arxiv.org/pdf/2202.11908.pdf
+
+Definition cond(a,b,c) :=
+  require a in ints && b in ints && c in ints;
+  if a <= 0; b else c
+
+Definition loop(a,b,x:y:f(x,y)) :=
+  require a in ints && b in ints;
+  if a <= 0; b
+  else take(u :
+    require u[0] = b && forall_in(1..a, n : u[n] = f(u[n-1],n));
+    u[a]
+  )
+
+Definition loop2(a,b,c, x:y:z:f(x,y,z),x:y:z:g(x,y,z)) :=
+  require a in ints && b in ints && c in ints;
+  if a <= 0; b
+  else take2(u:v:
+    require u[0] = b && forall_in(1..a, n : u[n] = f(u[n-1],v[n-1],n));
+    require v[0] = c && forall_in(1..a, n : v[n] = g(u[n-1],v[n-1],n));
+    require v[a] in ints;
+    u[a]
+  )
+
+Definition compr(a, x:f(x)) :=
+  require a in nats;
+  take(ms :
+    require domain(ms) = 0 .. a;
+    require image(ms) = 0 .. ms[a] & set(m : f(m) <= 0);
+    require ms is_increasing;
+    require forall_in(0 .. ms[a], m : f(m) in ints);
+    ms[a]
+  )
+
+# typing concept
+
+Definition int_or_null(X) := X = null || X in ints
+
+# all the following axioms could be hypothetically proven,
+# just that I am lazy to do so
+
+Axiom cond0 : a in ints => int_or_null(b) => c in ints =>
+  a <= 0 => cond(a,b,c) = b
+Axiom cond1 : a in ints => b in ints => int_or_null(c) =>
+  a > 0 => cond(a,b,c) = c
+
+Axiom loop_ind0 : a in ints => int_or_null(b) =>
+  a <= 0 => loop(a,b,x:y:f(x,y)) = b
+Axiom loop_ind1 : a in ints => b in ints =>
+  a > 0 => loop(a,b,x:y:f(x,y)) = loop(a-1,f(b,a), x:y:f(x,y))
+
+Axiom loop2_ind0 : a in ints => int_or_null(b) => c in ints =>
+  a <= 0 => loop2(a,b,c, x:y:z:f(x,y,z),x:y:z:g(x,y,z)) = b
+Axiom loop2_ind1 : a in ints => b in ints => c in ints =>
+  a > 0 =>
+    loop2(a,b,c, x:y:z:f(x,y,z),x:y:z:g(x,y,z)) = 
+    loop2(a-1,f(b,c,a),g(b,c,a), x:y:z:f(x,y,z),x:y:z:g(x,y,z))
+
+Axiom compr_ind0 :
+  M >= 0 => M in ints => f(M,0) in ints =>
+  f(M,0) <= 0 =>
+  forall(m : m < M => m >= 0 => f(m, 0) > 0 && f(m,0) in ints
+  ) =>
+  compr(0, x:f(x)) = M
+
+Axiom compr_ind1 : a in ints =>
+  compr(a, x:f(x)) = M0 =>
+  M1 > M0 => M1 in ints => f(M1) in ints =>
+  f(M1) <= 0 =>  
+  forall(m : m < M1 => m > M0 => f(m) > 0 && f(m) in ints) =>
+  compr(a+1, x:f(x)) = M1
+
+# extensionality
+
+Axiom ext_2_loop : forall(x: forall(y: BODY(x,y) = BODY2(x,y)))
+  => loop(A,B, x:y:BODY(x,y)) = loop(A,B, x:y:BODY2(x,y))
+Axiom ext_3_loop2 : forall(x: forall(y: forall(z: BODY(x,y,z) = BODY2(x,y,z))))
+  => loop2(A,B,C, x:y:z:BODY(x,y,z), x:y:z:BODY3(x,y,z)) = loop2(A,B,C, x:y:z:BODY2(x,y,z), x:y:z:BODY3(x,y,z))
+Axiom ext_4_loop2 : forall(x: forall(y: forall(z: BODY(x,y,z) = BODY2(x,y,z))))
+  => loop2(A,B,C, x:y:z:BODY0(x,y,z), x:y:z:BODY(x,y,z)) = loop2(A,B,C, x:y:z:BODY0(x,y,z), x:y:z:BODY2(x,y,z))
+Axiom ext_1_compr : forall(x: BODY(x) = BODY2(x))
+  => compr(A, x:BODY(x)) = compr(A, x:BODY2(x))
+
+# introduction of default local facts
+
+Axiom localrw_0__if : (C => A = A2) => (if C; A else B) = (if C; A2 else B)
+Axiom localrw_1__if : (!C => B = B2) => (if C; A else B) = (if C; A else B2)
+Axiom localrw_0_cond : (C <= 0 => A = A2) => cond(C,A,B) = cond(C,A2,B)
+Axiom localrw_1_cond : (C > 0 => B = B2) => cond(C,A,B) = cond(C,A,B2)
+Axiom localrw_loop :
+  forall(x: forall(y: x in ints => y in ints => y > 0 => y <= A => BODY(x,y) = BODY2(x,y)))
+  => loop(A,B, x:y:BODY(x,y)) = loop(A,B, x:y:BODY2(x,y))
+Axiom localrw_loop2 :
+  forall(x: forall(y: forall(z: x in ints => y in ints => z in ints => z > 0 => z <= A
+    => BODY1(x,y,z) = BODY3(x,y,z) && BODY2(x,y,z) = BODY4(x,y,z))))
+  => loop2(A,B,C, x:y:z:BODY1(x,y,z),x:y:z:BODY2(x,y,z)) = loop2(A,B,C, x:y:z:BODY3(x,y,z),x:y:z:BODY4(x,y))
+Axiom localrw_compr : forall(x: x in ints => x >= 0 => BODY(x) = BODY2(x))
+  => compr(A, x:BODY(x)) = compr(A, x:BODY2(x))
+
+# invariant introduction
+
+Axiom invariant_loop :
+  PRED(B,0) =>
+  forall(x:forall(y: PRED(x,y) => PRED(BODY(x,y),y+1))) =>
+  forall(x:forall(y: PRED(x,y) => BODY(x,y) = BODY2(x,y)))
+  => loop(A,B, x:y:BODY(x,y)) = loop(A,B, x:y:BODY2(x,y))
+
+Axiom invariant_loop2 :
+  PRED(B,C,0) =>
+  forall(x:forall(y:forall(PRED(x,y,z) => PRED(BODY1(x,y,z),BODY2(x,y,z),z+1)))) =>
+  forall(x:forall(y:forall(z: PRED(x,y,z)
+    => BODY1(x,y,z) = BODY2(x,y,z) && BODY3(x,y,z) = BODY4(x,y,z))))
+  => loop2(A,B,C, x:y:z:BODY1(x,y,z),x:y:z:BODY2(x,y,z)) = loop2(A,B,C, x:y:z:BODY3(x,y,z),x:y:z:BODY4(x,y))
+ 
+# simplfications
+
+Axiom trivial_loop : forall(y : x in ints => x >= 0 => x <= A => f(x) != null)
+  => A > 0 => A in ints => B in ints
+  => loop(A,B, x:y:f(y)) = f(A)
+Axiom trivial_loop2 : forall(z : z in ints => z >= 0 => z <= A => f(z) != null && g(z) != null)
+  => A > 0 => A in ints => B in ints => C in ints
+  => loop2(A,B,C, x:y:z:f(z), x:y:z:g(z)) = f(A)
+Axiom compr_takes_bool : compr(A, x:BODY(x)) = compr(A, x : if BODY(x) <= 0; 0 else 1)
+
+# Simplifications
+
+Axiom simp_loop_to_sum : forall(x : x in ints => int_or_null(BODY(x)))
+  => loop(A,B, x:y:x+BODY(y)) = B+sum(1..A, x:BODY(x))
+Axiom simp_loop_to_product : forall(x : x in ints => int_or_null(BODY(x)))
+  => loop(A,B, x:y:x*BODY(y)) = B*prod(1..A, x:BODY(x))
+
+Axiom simp_loop1_to_let : B in ints => int_or_null(let(B, x:BODY(x,1))) => loop(1,B, x:y:BODY(x,y)) = let(B, x:BODY(x,1))
+Axiom simp_loop2_to_loop : C in ints => K in ints =>
+  loop2(A,B,C, x:y:z:BODY(x,y,z), x:y:z:K+y) = let(C, c: loop(A,B, x:y:BODY(x,K*(y-1)+c,y)))
+Axiom simp_1_mul : int_or_null(x) => 1*x = x
+Axiom simp_mul_1 : int_or_null(x) => x*1 = x
+
+Axiom simp_zero_minus : 0 - a = -a
+Axiom plus_to_double : X+X = 2*X
+
+# triangle packing
+
+Definition tri_pack(X,Y) := require X in nats; require Y in nats; binom(X+Y+1,2)+X
+Definition tri_unpack0(P) := if P < 0; require P in ints; P
+  else unique(x : require x in nats; exists(y : require x in nats; tri_pack(x,y) = P))
+Definition tri_unpack1(P) := if P < 0; require P in ints; -P
+  else unique(y : require y in nats; exists(x : require x in nats; tri_pack(x,y) = P))
+
+
+# these bounds would be nice to get eventually checked for a +-1 error
+
+Axiom loop_to_tri_unpack0:
+  forall(n: n in ints => P in ints => n >= 0 => P >= (n+1)*n//2 => (n <= BOUND && BOUND % 1 = 0))
+  => loop(BOUND, P, a : b : a - if b - a <= 0 ; b else 0) = tri_unpack0(P)
+  
+Axiom loop_to_tri_unpack1:
+  forall(n: n in ints => P in ints => n >= 0 => P >= (n+1)*n//2 => (n <= BOUND && BOUND % 1 = 0))
+  => loop(BOUND, P, a : b : a - if a <= 0 ; 0 else 1 + b) = -tri_unpack1(P)
+
+# cheater version of simplifications (allowing inconsistency but whatever)
+
+Axiom cheat_simp_loop_to_sum0 : loop(x+A,B, x:y:x+BODY(y)) = B+sum(1..A, x:BODY(x))
+Axiom cheat_simp_loop_to_sum1 : loop(x+A,B, x:y:BODY(y)+x) = B+sum(1..A, x:BODY(x))
+Axiom cheat_simp_loop_to_product0 : loop(A,B, x:y:x*BODY(y)) = B*prod(1..A, x:BODY(x))
+Axiom cheat_simp_loop_to_product1 : loop(A,B, x:y:BODY(y)*x) = B*prod(1..A, x:BODY(x))
+
+Axiom cheat_simp_loop1_to_let : loop(1,B, x:y:BODY(x,y)) = let(B, x:BODY(x,1))
+Axiom cheat_simp_loop2_to_loop :
+  loop2(A,B,C, x:y:z:BODY(x,y,z), x:y:z:K+y) = loop(A,B, x:y:BODY(x,K*(y-1)+C,y))
+Axiom cheat_simp_1_mul : 1*x = x
+Axiom cheat_simp_mul_1 : x*1 = x
+Axiom cheat_simp_cond_to_if : cond(c,a,b) = (if c <= 0; a else b)
+Axiom cheat_simp_prod_to_factorial : prod(1..n, x:x) = factorial(n)
+Axiom cheat_simp_minus_minus : --X = X
+Axiom cheat_simp_zero_plus : 0+X = X
+Axiom cheat_simp_prod_to_power : prod(1..n, _:x) = x^n

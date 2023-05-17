@@ -44,18 +44,14 @@ Axiom lte_require_reals : (x <= y) => x in reals && y in reals
 
 # axioms about basic operations
 
-Axiom plus_comm : x in reals => y in reals =>
-  x + y = y + x
-Axiom plus_assoc : x in reals => y in reals => z in reals =>
-  x + (y + z) = (x + y) + z
+Axiom plus_comm : x + y = y + x
+Axiom plus_assoc : x + (y + z) = (x + y) + z
 Axiom plus_zero : x in reals =>
   x + 0 = x
 Axiom plus_uminus : x in reals =>
   x + (-x) = 0
-Axiom times_comm : x in reals => y in reals =>
-  x * y = y * x
-Axiom times_assoc : x in reals => y in reals => z in reals =>
-  x * (y * z) = (x * y) * z
+Axiom times_comm : x * y = y * x
+Axiom times_assoc : x * (y * z) = (x * y) * z
 Axiom times_one : x in reals =>
   x * 1 = x
 Axiom times_plus : x in reals => y in reals => z in reals =>
