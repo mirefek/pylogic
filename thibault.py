@@ -1,12 +1,12 @@
 from term import Term, BVar, TermApp, TermFunction
 from parse_term import TermParser
-from logic_core import LogicCore
+from logic_core import LogicCore, CoreTheorem
 from calculator import Calculator, LogicCalculation
 from calc_set_fun import SetCalculation, FunCalculation, BinderCalculation, MathSet, MathFun, MathNumber
 from calc_numbers import CalculationNumbers
 from calc_thibault import CalculationThibault
 from logic_env import LogicEnv, ConstantSet
-from int_hammer import IntHammer
+from int_hammer import IntHammerCVC4
 from unification import Unification
 from pytheorem import Theorem
 from rewriter import RootRewriter, RootRewriterSingle, RootRewriterList, RootRewriterCalc
@@ -23,8 +23,9 @@ class ThibaultEnv:
         self.parser.parse_file("axioms_numbers")
         self.parser.parse_file("axioms_thibault")
         self.env.constants = ConstantSet(self.env) # reload constants
-        self.int_hammer = IntHammer(self.core, self.parser.name_signature_to_const, self.calculator)
+        self.int_hammer = IntHammerCVC4(self.core, self.parser.name_signature_to_const, self.calculator)
         self.env.add_generalize_axioms()
+        self.add_rewriter_extensionality()
 
         self.calculator.add_functions(
             self.parser.name_signature_to_const,
@@ -82,6 +83,18 @@ class ThibaultEnv:
         }
         self.X = self.parser.get_var('X', 0)
 
+    def add_rewriter_extensionality(self):
+        rewriter = self.env.rewriter
+        ax = self.env.axioms
+        rewriter.add_extensionality(ax.ext_2_loop)
+        rewriter.add_extensionality(ax.ext_3_loop2)
+        rewriter.add_extensionality(ax.ext_4_loop2)
+        rewriter.add_extensionality(ax.ext_1_compr)
+        rewriter.add_extensionality(self.env.add_axiom("forall(x : BODY(x) = BODY2(x)) => let(A, x:BODY(x)) = let(A, x:BODY2(x))"))
+        rewriter.add_extensionality(self.env.add_axiom("forall(x : BODY(x) = BODY2(x)) => sum(A, x:BODY(x)) = sum(A, x:BODY2(x))"))
+        rewriter.add_extensionality(self.env.add_axiom("forall(x : BODY(x) = BODY2(x)) => prod(A, x:BODY(x)) = prod(A, x:BODY2(x))"))
+        rewriter.add_extensionality(self.env.add_axiom("forall(x : BODY(x) = BODY2(x)) => exists_in(A, x:BODY(x)) = exists_in(A, x:BODY2(x))"))
+
     def letters_to_seq_program(self, letters):
         stack = []
         for letter in letters:
@@ -138,6 +151,36 @@ class PushNumbersLeft(RootRewriter):
         value = self.calculator.get_term_value(term)
         return isinstance(value, MathNumber)
 
+class SimplifyLet(RootRewriter):
+    def __init__(self, let_const):
+        self.let_const = let_const
+        self.def_thm = let_const.def_thm
+        self.A = self.def_thm.term[0][0].f
+        self.BODY = self.def_thm.term[0][1].f
+    def try_rw(self, term):
+        if term.f != self.let_const: return None
+        if self.is_simple_term(term[0]) or self.is_single_occuring_bvar(term[1], 1):
+            return self.def_thm.specialize({
+                self.A : term[0],
+                self.BODY: term[1],
+            })
+
+    def is_single_occuring_bvar(self, term, bvar):
+        if bvar not in term.bound_vars: return True
+        while not isinstance(term, BVar):
+            index = None
+            for i,arg in enumerate(term.args):
+                if bvar in arg.bound_vars:
+                    if index is None: index = i
+                    else: return False
+            assert index is not None
+            bvar += term.f.signature[bvar]
+            term = term[index]
+        return True
+
+    def is_simple_term(self,term):
+        return isinstance(term, BVar) or term.f.arity == 0
+
 class RootRewriterTripack(RootRewriter):
     def __init__(self, tenv):
         self.env = tenv.env
@@ -178,13 +221,36 @@ class RootRewriterTripack(RootRewriter):
             assumption_bare = assumption[0].substitute_bvars([self.N.to_term()]) # remove forall
             assumption_bare = assumption_bare[1][1] # remove typing assumptions
             hammer_response = self.int_hammer.verify(assumption_bare, time_limit = 2, debug = False)
-            if hammer_response is None:
+            if not isinstance(hammer_response, CoreTheorem):
                 self.hammer_cache.get[assumption] = False
+                return None
             assumption_thm = Theorem(self.env, hammer_response)
             assumption_thm = assumption_thm.generalize(self.N)
             self.hammer_cache[assumption] = assumption_thm
 
         return axiom.modus_ponens_basic(assumption_thm.specialize({self.P : ori_var}))
+
+class SimpRewriter(RootRewriterList):
+    def __init__(self, tenv):
+        ax = tenv.env.axioms
+        simp_axioms = []
+        simp_axioms.append(ax.simp_zero_minus)
+        simp_axioms.append(ax.plus_assoc)
+        simp_axioms.append(ax.times_assoc)
+        simp_axioms.append(ax.plus_to_double)
+        simp_axioms.append(ax.times_to_square)
+
+        for name in ax._core_dict.keys():
+            axiom = getattr(ax, name)
+            if name.startswith("cheat_simp_"):
+                simp_axioms.append(axiom)
+
+        super().__init__([
+            tenv.env.rewriter.to_root_rewriter(*simp_axioms).to_pattern_rw(),
+            SimplifyLet(tenv.env.constants.let),
+            PushNumbersLeft(tenv.env, tenv.calculator),
+            RootRewriterTripack(tenv),
+        ])
 
 if __name__ == "__main__":
     import sys
@@ -192,35 +258,8 @@ if __name__ == "__main__":
     tenv = ThibaultEnv()
     env = tenv.env
 
-    ax = env.axioms
-    env.add_generalize_axioms()
     rewriter = env.rewriter
-    rewriter.add_extensionality(ax.ext_2_loop)
-    rewriter.add_extensionality(ax.ext_3_loop2)
-    rewriter.add_extensionality(ax.ext_4_loop2)
-    rewriter.add_extensionality(ax.ext_1_compr)
-    rewriter.add_extensionality(env.add_axiom("forall(x : BODY(x) = BODY2(x)) => let(A, x:BODY(x)) = let(A, x:BODY2(x))"))
-    rewriter.add_extensionality(env.add_axiom("forall(x : BODY(x) = BODY2(x)) => sum(A, x:BODY(x)) = sum(A, x:BODY2(x))"))
-    rewriter.add_extensionality(env.add_axiom("forall(x : BODY(x) = BODY2(x)) => prod(A, x:BODY(x)) = prod(A, x:BODY2(x))"))
-
-    simp_axioms = []
-    simp_axioms.append(ax.simp_zero_minus)
-    simp_axioms.append(ax.plus_assoc)
-    simp_axioms.append(ax.times_assoc)
-    simp_axioms.append(ax.plus_to_double)
-
-    for name in ax._core_dict.keys():
-        axiom = getattr(ax, name)
-        if name.startswith("cheat_simp_"):
-            simp_axioms.append(axiom)
-
-    root_rewriter_tripack = RootRewriterTripack(tenv)
-    push_numbers_left = PushNumbersLeft(env, tenv.calculator)
-    simp_rewriter = RootRewriterList([
-        rewriter.to_root_rewriter(*simp_axioms).to_pattern_rw(),
-        push_numbers_left,
-        root_rewriter_tripack,
-    ])
+    simp_rewriter = SimpRewriter(tenv)
 
     for line in sys.stdin:
         print()

@@ -542,7 +542,7 @@ class FirstOrderToTPTPConfig:
             const_dir["_neg", (0,)] : ['~', 0],
             const_dir["_and", (0,0)] : [0,'&',1],
             const_dir["_or", (0,0)] : [0,'|',1],
-            const_dir["_xor", (0,0)] : [0,'|',1],
+            const_dir["_xor", (0,0)] : [0,'^',1],
             const_dir["_equiv", (0,0)] : [0,'<=>',1],
             const_dir["true", ()] : ['$true'],
             const_dir["false", ()] : ['$false'],

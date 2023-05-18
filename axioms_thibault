@@ -140,6 +140,7 @@ Axiom simp_mul_1 : int_or_null(x) => x*1 = x
 
 Axiom simp_zero_minus : 0 - a = -a
 Axiom plus_to_double : X+X = 2*X
+Axiom times_to_square : X*X = X^2
 
 # triangle packing
 
@@ -177,3 +178,6 @@ Axiom cheat_simp_prod_to_factorial : prod(1..n, x:x) = factorial(n)
 Axiom cheat_simp_minus_minus : --X = X
 Axiom cheat_simp_zero_plus : 0+X = X
 Axiom cheat_simp_prod_to_power : prod(1..n, _:x) = x^n
+Axiom cheat_simp_power_to_times : (A^B)^C = A^(B*C)
+Axiom cheat_simp_power_times_to_plus : A^B * A^C = A^(B+C)
+Axiom cheat_simp_cancel_times_floordiv : A*(X//A) + X%A = X

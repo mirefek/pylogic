@@ -448,3 +448,8 @@ if __name__ == "__main__":
         "loop(A % 2, 5, a : b : a + a)",
         frozen = ((), None),
     )
+    test_unification(
+        "loop(A, B, if PRED(x, y) ; C else x)",
+        "if exists_in(1 .. A, x : PRED(x, B)) ; C else B",
+        frozen = ((), None),
+    )
