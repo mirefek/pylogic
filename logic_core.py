@@ -144,16 +144,18 @@ class CoreTheorem:
         return self.to_str()
 
 class LogicCore:
-    def __init__(self):
+    def __init__(self, record_proof = False):
         self._thms = dict() # multiset -- thm to count
         self._strict_mode = False
         self.equality = TermConstant((0,0), name = "__eq__")
         self.implication = TermConstant((0,0), name = "__impl__")
         self._creating_theorem = False
         self._trusted = set()
+        self._record_proof = record_proof
 
     def _make_thm(self, assumptions, term, origin, free_vars = None):
         self._creating_theorem = True
+        if not self._record_proof: origin = "unrecorded"
         thm = CoreTheorem(self, assumptions, term, origin, free_vars)
         self._creating_theorem = False
         return thm
