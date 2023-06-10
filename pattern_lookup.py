@@ -90,8 +90,9 @@ class PatternLookup:
     def set_frozen(self, frozen_vars):
         return self._replace(frozen_vars = frozen_vars)
 
-    def _final_unify(self, term, match_term, match_term_vars):
-        unification = Unification(frozen = (self._frozen_vars, None))
+    def _final_unify(self, term, match_term, match_term_vars, frozen = None):
+        if frozen is None: frozen = self._frozen_vars
+        unification = Unification(frozen = (frozen, None))
         unification.add_requirement(match_term,0, term,1)
         if unification.run():
             subst,_ = unification.export_substitutions(

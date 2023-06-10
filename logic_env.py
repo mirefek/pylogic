@@ -9,14 +9,35 @@ from pattern_lookup import PatternLookupImpl
 from goal_context import GoalEnv
 from tactics import Tactics
 from term import BVar, TermApp
+from calculator import Calculator, LogicCalculation
+from calc_set_fun import SetCalculation, FunCalculation, BinderCalculation, MathSet, MathFun, MathNumber
+from calc_numbers import CalculationNumbers
+
 
 class LogicEnv:
     def __init__(self):
         self.core = LogicCore()
-        self.parser = TermParser(self.core)
+        self.calculator = Calculator(self.core)
+        self.calculator.accept_types(MathSet, MathFun, MathNumber)
+        self.parser = TermParser(
+            self.core,
+            int_to_term = lambda n: self.calculator.get_value_term(MathNumber(n))
+        )
         self.parser.parse_file("axioms_logic")
         self.parser.parse_file("axioms_set")
         self.parser.parse_file("axioms_fun")
+        self.parser.parse_file("axioms_numbers")
+
+        self.calculator.accept_types(MathSet, MathFun, MathNumber)
+        self.calculator.add_functions(
+            self.parser.name_signature_to_const,
+            LogicCalculation(),
+            SetCalculation(),
+            FunCalculation(),
+            BinderCalculation(),
+            CalculationNumbers(),
+        )
+
         self._name_to_label = dict()
         self.impl_rules = dict() # name => PatternLookupImpl
 

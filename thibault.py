@@ -16,11 +16,8 @@ class ThibaultEnv:
     def __init__(self):
         self.env = LogicEnv()
         self.core = self.env.core
-        self.calculator = Calculator(self.core)
-        self.calculator.accept_types(MathSet, MathFun, MathNumber)
+        self.calculator = self.env.calculator
         self.parser = self.env.parser
-        self.parser.int_to_term = lambda n: self.calculator.get_value_term(MathNumber(n))
-        self.parser.parse_file("axioms_numbers")
         self.parser.parse_file("axioms_thibault")
         self.env.constants = ConstantSet(self.env) # reload constants
         self.int_hammer = IntHammerCVC4(self.core, self.parser.name_signature_to_const, self.calculator)
@@ -29,11 +26,6 @@ class ThibaultEnv:
 
         self.calculator.add_functions(
             self.parser.name_signature_to_const,
-            LogicCalculation(),
-            SetCalculation(),
-            FunCalculation(),
-            BinderCalculation(),
-            CalculationNumbers(),
             CalculationThibault(),
         )
 
