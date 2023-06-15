@@ -34,6 +34,7 @@ class AbstractIntHammer(Verifier):
             constants["_times", (0,0)] : 'times',
             constants["_floordiv", (0,0)] : 'div',
             constants["_mod", (0,0)] : 'mod',
+            constants["_power", (0,0)] : 'power',
         }
 
         # for adding typing assumptions
@@ -302,7 +303,18 @@ class IntHammerSMT(AbstractIntHammer):
         return '('+' '.join(elements)+')'
     def connective_to_str(self, *args): return self.anything_to_str(*args)
     def predicate_to_str(self, *args): return self.anything_to_str(*args)
-    def operation_to_str(self, *args): return self.anything_to_str(*args)
+    def operation_to_str(self, op, args):
+        if op == "power":
+            base,exp = args
+            if not exp.isnumeric(): return None
+            exp = int(exp)
+            if not 0 <= exp <= 10: return None
+            if exp == 0: return '1'
+            res = base
+            for _ in range(exp-1): res = self.operation_to_str('times', [res, base])
+            return res
+        else:
+            return self.anything_to_str(op, args)
 
     def get_varname(self, name, used_names):
         if not self.var_name_regex.fullmatch(name):
@@ -485,6 +497,9 @@ if __name__ == "__main__":
        x >= (n+1)*n//2 =>
        n <= (10 + (2 * (x // 40)))
     """)
+    problem_squares = parser.parse_str("""
+       x^2 + y^2 = x^2 * y^2 => x = 0 && y = 0
+    """)
     print("=====   Vampire  =====")
     thm = hammer_vampire.verify(problem_true, debug = False)
     print(thm)
@@ -502,3 +517,6 @@ if __name__ == "__main__":
     cex = hammer_cvc4.verify(problem_false, debug = False)
     print(cex)
     print(calculator.calculate(problem_false.substitute_free(cex)))
+    print("=====   CVC4 disprovable  =====")
+    thm = hammer_cvc4.verify(problem_squares, debug = True)
+    print(thm)
