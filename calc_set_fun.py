@@ -13,8 +13,10 @@ class MathNumber:
     def __eq__(self, other):
         return isinstance(other, MathNumber) and other.x == self.x
     def __str__(self):
-        if self.x % 1 == 0: return str(int(self.x))
-        else: return str(self.x)
+        if self.x % 1 == 0:
+            if self.x < 0: return '('+str(int(self.x))+')'
+            else: return str(int(self.x))
+        else: return '('+str(self.x)+')'
 
 class MathSet(ContainerValue):
     def __init__(self, elements):

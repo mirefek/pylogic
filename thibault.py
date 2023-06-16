@@ -107,14 +107,19 @@ class ThibaultEnv:
         [res] = stack
         return res.substitute_bvars([self.X.to_term(), self.c_zero])
 
-    def eval_program(self, prog, x):
-        calc_eq = self.calculator.calculate(prog.substitute_free({
-            self.X : self.parser.int_to_term(x)
-        }), only_try = False)
+    def eval_closed(self, prog_term):
+        calc_eq = self.calculator.calculate(prog_term, only_try = False)
         if calc_eq is None: return None
         res = self.calculator._interpretation[calc_eq.term.args[1].f]()
         if not isinstance(res, MathNumber) or res.x % 1 != 0: return None
         return res.x
+
+    def eval_program(self, prog, x):
+        return self.eval_closed(
+            prog.substitute_free({
+                self.X : self.parser.int_to_term(x)
+            })
+        )
 
 class PushNumbersLeft(RootRewriter):
     def __init__(self, env, calculator):
