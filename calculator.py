@@ -31,23 +31,22 @@ class CalcTerm:
         self.used_bvars = used_bvars
     def evaluate_raw(self, bvar_values):
         raise Exception("Not implemented")
-    def evaluate(self, bvar_values, arity = 0):
+    def evaluate(self, bvar_values):
         key = tuple(
             v for i,v in enumerate(bvar_values)
-            if self.used_bvars & (1 << (i+arity))
-        ), arity
-        res = self.cache.get(key, None)
-        assert not (self.used_bvars >> (arity + len(bvar_values)))
-        if res is not None: return res
-        if arity == 0:
-            res = self.evaluate_raw(bvar_values)
-        else:
-            def res(*args):
-                assert len(args) == arity
-                args = tuple(reversed(args))
-                return self.evaluate(args + bvar_values)
+            if self.used_bvars & (1 << i)
+        )
+        if key in self.cache: return self.cache[key]
+        assert not (self.used_bvars >> (len(bvar_values)))
+        res = self.evaluate_raw(bvar_values)
         self.cache[key] = res
         return res
+    def as_function(self, bvar_values, arity):
+        def f(*args):
+            assert len(args) == arity
+            args = tuple(reversed(args))
+            return self.evaluate(args + bvar_values)
+        return f
 
 class CalcBvar(CalcTerm):
     def __init__(self, index):
@@ -67,10 +66,13 @@ class CalcStep(CalcTerm):
         self.signature = signature
         self.args = args
     def evaluate_raw(self, bvar_values):
-        args = [
-            arg.evaluate(bvar_values, arity = numb)
+        args = (
+            arg.as_function(bvar_values, numb)
             for arg, numb in zip(self.args, self.signature)
-        ]
+        )
+        # for arg, numb in zip(self.args, self.signature):
+        #     if numb: args.append(arg.as_function(bvar_values, numb))
+        #     else: args.append(arg.evaluate(bvar_values))
         return self.f(*args)
 
 class Calculator(Verifier):
@@ -78,8 +80,8 @@ class Calculator(Verifier):
         super().__init__(core, "calculator")
         self._const_to_term = dict()
         self._interpretation = {
-            core.implication : (lambda x,y: not x or y),
-            core.equality : (lambda x,y: x == y),
+            core.implication : (lambda x,y: not x() or y()),
+            core.equality : (lambda x,y: x() == y()),
         }
         self._accepted_types = (bool, type(None))
 
@@ -128,10 +130,7 @@ class Calculator(Verifier):
         self._const_to_term[value] = term
         return term
 
-    def calculate(self, term, only_try = False):
-        if not term.is_closed:
-            if only_try: return None
-            else: raise Exception(f"Calculated term '{term}' is not closed")
+    def build_calc_term(self, term):
         instr_list, terms = term_to_instr_list(term)
         calc_terms = []
         for f_args in instr_list:
@@ -140,16 +139,24 @@ class Calculator(Verifier):
                 calc_terms.append(CalcBvar(f))
             else:
                 if isinstance(f, TermVariable):
-                    if only_try: return None
                     raise Exception(f"Cannot calculate variable '{f}' (in '{term}')")
                 f_repr = self._interpretation.get(f, None)
                 if f_repr is None:
-                    if only_try: return None
                     raise Exception(f"Calculator: constant '{f}' doesn't have an interpretation")
                 args = [calc_terms[i] for i in f_args[1:]]
                 calc_terms.append(CalcStep(f_repr, f.signature, args))
+        return calc_terms[-1]
+    
+    def calculate(self, term, only_try = False):
+        if not term.is_closed:
+            if only_try: return None
+            else: raise Exception(f"Calculated term '{term}' is not closed")
 
-        calc_term = calc_terms[-1]
+        try:
+            calc_term = self.build_calc_term(term)
+        except Exception:
+            if only_try: return None
+            else: raise
         try:
             val = calc_term.evaluate(())
         except AssertionError:
@@ -157,8 +164,8 @@ class Calculator(Verifier):
             else: raise
 
         res = self.get_value_term(val)
-        calc_term = TermApp(self.core.equality, (term, res))
-        return self._make_thm(dict(), calc_term)
+        res = TermApp(self.core.equality, (term, res))
+        return self._make_thm(dict(), res)
 
     def add_functions(self, constant_dict, *function_modules, prefix = "calc_"):
         for function_module in function_modules:
@@ -169,37 +176,52 @@ class Calculator(Verifier):
                 name = full_name[len(prefix):]
                 if name[0].isdigit():
                     signature = []
+                    eval_args = []
                     while name[0].isdigit():
                         i = name.find('_')
                         numb = int(name[:i])
                         signature.append(int(name[:i]))
+                        eval_args.append(name[:i] == '0')
                         name = name[i+1:]
                     assert len(signature) == arity, (name, signature)
                     signature = tuple(signature)
+                    eval_args = tuple(eval_args)
                 else:
                     signature = (0,)*arity
+                    eval_args = (True,)*arity
                 const = constant_dict[name, signature]
-                self.set_interpretation(const, fun)    
+                self.set_interpretation(const, self._wrap_function(fun,eval_args))
+
+    def _wrap_function(self, fun, eval_args):
+        if True not in eval_args:
+            return fun
+        def fun2(*args):
+            return fun(*(
+                arg if not e else arg()
+                for arg,e in zip(args, eval_args)
+            ))
+        return fun2
 
 class LogicCalculation:
     def calc_true(self): return True
     def calc_false(self): return False
     def calc_null(self): return None
     def calc__neg(self, x): return not x
-    def calc__or(self, x, y): return x or y
+    def calc_00_00__or(self, x, y): return x() or y()
+    def calc_00_00__and(self, x, y): return x() and y()
     def calc__xor(self, x, y): return bool(x) != bool(y)
     def calc__equiv(self, x, y): return bool(x) == bool(y)
     def calc_to_bool(self, x): return bool(x)
     def calc_to_bool1(self, x): return x is None or x
-    def calc__if(self, c, a, b):
-        if c: return a
-        else: return b
-    def calc__require(self, c, a):
-        if c: return a
+    def calc_00_00_00__if(self, c, a, b):
+        if c(): return a()
+        else: return b()
+    def calc_00_00__require(self, c, a):
+        if c(): return a()
         else: return None
-    def calc__try(self, a, b):
+    def calc_0_00__try(self, a, b):
         if a is not None: return a
-        else: return b
+        else: return b()
     def calc__is_bool(self, x): return isinstance(x, bool)
     # insane objects except null are not expected to be representable
     def calc__is_sane(self, x): return x is not None

@@ -14,7 +14,7 @@ class MathNumber:
         return isinstance(other, MathNumber) and other.x == self.x
     def __str__(self):
         if self.x % 1 == 0:
-            if self.x < 0: return '('+str(int(self.x))+')'
+            if self.x < 0: return str(int(self.x))
             else: return str(int(self.x))
         else: return '('+str(self.x)+')'
 

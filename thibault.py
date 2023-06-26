@@ -1,7 +1,7 @@
-from term import Term, BVar, TermApp, TermFunction
+from term import Term, BVar, TermApp, TermFunction, TermVariable
 from parse_term import TermParser
 from logic_core import LogicCore, CoreTheorem
-from calculator import Calculator, LogicCalculation
+from calculator import Calculator, LogicCalculation, CalcTerm
 from calc_set_fun import SetCalculation, FunCalculation, BinderCalculation, MathSet, MathFun, MathNumber
 from calc_numbers import CalculationNumbers
 from calc_thibault import CalculationThibault
@@ -11,6 +11,7 @@ from unification import Unification
 from pytheorem import Theorem
 from rewriter import RootRewriter, RootRewriterSingle, RootRewriterList, RootRewriterCalc
 from share_term import TermCache
+from annotated_term import AnnotatedTerm
 
 class ThibaultEnv:
     def __init__(self):
@@ -120,6 +121,35 @@ class ThibaultEnv:
                 self.X : self.parser.int_to_term(x)
             })
         )
+
+    def add_calc_term_aux(self,
+            aterm : AnnotatedTerm,
+            cterm : CalcTerm,
+            fvs : list[TermVariable],
+    ):
+        aterm.calc_fvs = fvs
+        aterm.calc_term = cterm
+        if aterm.subterms:
+            for asub, csub in zip(aterm.subterms, cterm.args):
+                self.add_calc_term_aux(asub, csub, fvs)
+
+    def add_calc_term(self, aterm : AnnotatedTerm):
+        fvs = aterm.term.get_ordered_free_vars()
+        assert all(fv.arity == 0 for fv in fvs)
+        term = aterm.term.substitute_free({
+            fv : BVar(len(fvs)-i) for i,fv in enumerate(fvs)
+        })
+        calc_term = self.env.calculator.build_calc_term(term)
+        self.add_calc_term_aux(aterm, calc_term, fvs)
+
+    def eval_aterm(self, aterm : AnnotatedTerm, *args):
+        args = tuple(MathNumber(arg) for arg in reversed(args))
+        try:
+            value = aterm.calc_term.evaluate(args)
+        except AssertionError:
+            return None
+        if isinstance(value, MathNumber): return value.x
+        else: return None
 
 class PushNumbersLeft(RootRewriter):
     def __init__(self, env, calculator):
@@ -236,6 +266,9 @@ class SimpRewriter(RootRewriterList):
         simp_axioms.append(ax.times_assoc)
         simp_axioms.append(ax.plus_to_double)
         simp_axioms.append(ax.times_to_square)
+        minus_ax = tenv.env.add_axiom("(-1)*X = -X")
+        minus_ax = minus_ax.rw(tenv.env.calculator)
+        simp_axioms.append(minus_ax)
 
         for name in ax._core_dict.keys():
             axiom = getattr(ax, name)
@@ -265,13 +298,23 @@ if __name__ == "__main__":
         if prog is None:
             print("Conversion to a program failed")
             continue
-        print("Original program:", prog)
+        prog_aterm = AnnotatedTerm(prog)
+        prog_aterm.add_notation()
+        prog_aterm.notation.auto_split_lines()
+
+        print("Original program:")
+        print(prog_aterm)
         print([tenv.eval_program(prog, n) for n in range(20)])
 
         print("rewriting...")
         prog = rewriter.run(prog, simp_rewriter, repeat = True).term[1]
 
-        print("Rewritten program:", prog)
+        prog_aterm = AnnotatedTerm(prog)
+        prog_aterm.add_notation()
+        prog_aterm.notation.auto_split_lines()
+
+        print("Rewritten program:")
+        print(prog_aterm)
         print([tenv.eval_program(prog, n) for n in range(20)])
 
     print()

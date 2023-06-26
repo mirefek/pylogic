@@ -2,7 +2,7 @@ from fractions import Fraction
 from calc_set_fun import MathSet, MathFun, MathNumber
 
 class CalculationNumbers:
-    def calc__plus(self, x,y):
+    def calc__plus(self, x: MathNumber, y : MathNumber):
         if not isinstance(x, MathNumber): return None
         if not isinstance(y, MathNumber): return None
         return MathNumber(x.x + y.x)

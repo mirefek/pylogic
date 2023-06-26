@@ -177,7 +177,10 @@ Axiom cheat_simp_cond_to_if : cond(c,a,b) = (if c <= 0; a else b)
 Axiom cheat_simp_prod_to_factorial : prod(1..n, x:x) = factorial(n)
 Axiom cheat_simp_minus_minus : --X = X
 Axiom cheat_simp_zero_plus : 0+X = X
+Axiom cheat_simp_zero_times : 0*X = 0
 Axiom cheat_simp_prod_to_power : prod(1..n, _:x) = x^n
 Axiom cheat_simp_power_to_times : (A^B)^C = A^(B*C)
 Axiom cheat_simp_power_times_to_plus : A^B * A^C = A^(B+C)
 Axiom cheat_simp_cancel_times_floordiv : A*(X//A) + X%A = X
+Axiom cheat_simp_triunpack0: tri_unpack0(y + (X^2+X)//2) = y
+Axiom cheat_simp_triunpack1: tri_unpack1(y + (X^2+X)//2) = X-y
