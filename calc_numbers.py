@@ -1,5 +1,6 @@
 from fractions import Fraction
 from calc_set_fun import MathSet, MathFun, MathNumber
+from term import TermApp
 
 class CalculationNumbers:
     def calc__plus(self, x: MathNumber, y : MathNumber):
@@ -126,6 +127,23 @@ class CalculationNumbers:
         if not isinstance(n, MathNumber) or n.x % 1 or n.x < 0: return None
         return MathNumber(x.x ** n.x)
 
+def math_number_expansion(calculator, name_signature_to_const):
+    uminus = name_signature_to_const['_uminus', (0,)]
+    divide = name_signature_to_const['_divide', (0,0)]
+    def expand_math_number(value):
+        if not isinstance(value, MathNumber): return None
+        if value.x % 1 == 0 and value.x > 0: return None
+        if value.x % 1 != 0:
+            numerator = calculator.get_value_term(MathNumber(abs(value.x.numerator)))
+            denominator = calculator.get_value_term(MathNumber(value.x.denominator))
+            res = TermApp(divide, (numerator, denominator))
+        else:
+            res = calculator.get_value_term(MathNumber(abs(int(value.x))))
+        if value.x < 0:
+            res = TermApp(uminus, (res,))
+        return res
+    return expand_math_number
+
 if __name__ == "__main__":
     from parse_term import TermParser
     from logic_core import LogicCore
@@ -150,8 +168,16 @@ if __name__ == "__main__":
         BinderCalculation(),
         CalculationNumbers(),
     )
+    calculator.set_term_expansion(
+        MathNumber,
+        math_number_expansion(
+            calculator,
+            parser.name_signature_to_const,
+        )
+    )
     def tt(s):
         return parser.parse_str(s)
+    print(calculator.calculate(tt("1/3 - 1/2")))
     print(calculator.calculate(tt("sum(1..10, x : x)")))
     print(calculator.calculate(tt("sum(1..5, a:sum(1..a, x : 2*x-1))")))
     print(calculator.calculate(tt("fun_on(0..5, n : fun_on(0..n, k:binom(n,k)))")))

@@ -11,8 +11,7 @@ from tactics import Tactics
 from term import BVar, TermApp
 from calculator import Calculator, LogicCalculation
 from calc_set_fun import SetCalculation, FunCalculation, BinderCalculation, MathSet, MathFun, MathNumber
-from calc_numbers import CalculationNumbers
-
+from calc_numbers import CalculationNumbers, math_number_expansion
 
 class LogicEnv:
     def __init__(self):
@@ -36,6 +35,13 @@ class LogicEnv:
             FunCalculation(),
             BinderCalculation(),
             CalculationNumbers(),
+        )
+        self.calculator.set_term_expansion(
+            MathNumber,
+            math_number_expansion(
+                self.calculator,
+                self.parser.name_signature_to_const,
+            )
         )
 
         self._name_to_label = dict()
@@ -132,7 +138,7 @@ class LogicEnv:
     def add_generalize_axioms(self): # could we proven but takes too long...
         self.forall_intro_full = self.add_axiom("to_bool1(PRED(example(x : ! to_bool1(PRED(x))))) => forall(x : PRED(x))")
         self.forall_intro = self.add_axiom("PRED(example(x : ! to_bool1(PRED(x)))) => forall(x : PRED(x))")
-    
+
 class AxiomSet:
     def __init__(self, env):
         self._env = env

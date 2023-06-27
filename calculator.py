@@ -84,6 +84,7 @@ class Calculator(Verifier):
             core.equality : (lambda x,y: x() == y()),
         }
         self._accepted_types = (bool, type(None))
+        self._type_to_expansion = dict()
 
     def set_interpretation(self, termfun, python_fun):
         if self.core._strict_mode:
@@ -98,6 +99,11 @@ class Calculator(Verifier):
             raise Exception("Cannot add accepted calculation types in strict mode")
         ts = tuple(t for t in ts if t not in self._accepted_types)
         self._accepted_types = self._accepted_types + ts
+
+    def set_term_expansion(self, t, expansion):
+        if self.core._strict_mode:
+            raise Exception("Cannot set term expansion in strict mode")
+        self._type_to_expansion[t] = expansion
 
     def is_admissible_value(self, value):
         if not isinstance(value, self._accepted_types):
@@ -124,9 +130,15 @@ class Calculator(Verifier):
         if value in self._const_to_term:
             return self._const_to_term[value]
         assert self.is_admissible_value(value), value
-        f = TermConstant((), self.get_value_name(value))
-        term = TermApp(f, ())
-        self._interpretation[f] = lambda : value
+        #print(f"get_value_term({value})")
+        expansion = self._type_to_expansion.get(type(value))
+        #print(type(value), expansion, self._type_to_expansion)
+        if expansion is not None: term = expansion(value)
+        else: term = None
+        if term is None:
+            f = TermConstant((), self.get_value_name(value))
+            term = TermApp(f, ())
+            self._interpretation[f] = lambda : value
         self._const_to_term[value] = term
         return term
 

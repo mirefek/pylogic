@@ -82,9 +82,10 @@ class RootRewriterCalc(RootRewriter):
         self.calculator = calculator
     def try_rw(self, term):
         if not term.is_closed or term.free_vars: return None
-        if not term.args: return None # already simplfied
         core_thm = self.calculator.calculate(term)
         if core_thm is None: return None
+        term2 = core_thm.term.args[1]
+        if term2.equals_to(term): return None # already simplfied
         thm = Theorem(self.env, core_thm)
         return thm
 

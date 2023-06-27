@@ -109,9 +109,8 @@ class ThibaultEnv:
         return res.substitute_bvars([self.X.to_term(), self.c_zero])
 
     def eval_closed(self, prog_term):
-        calc_eq = self.calculator.calculate(prog_term, only_try = False)
-        if calc_eq is None: return None
-        res = self.calculator._interpretation[calc_eq.term.args[1].f]()
+        calc_term = self.env.calculator.build_calc_term(prog_term)
+        res = calc_term.evaluate(())
         if not isinstance(res, MathNumber) or res.x % 1 != 0: return None
         return res.x
 
@@ -151,32 +150,24 @@ class ThibaultEnv:
         if isinstance(value, MathNumber): return value.x
         else: return None
 
-class PushNumbersLeft(RootRewriter):
-    def __init__(self, env, calculator):
+class PushClosedLeft(RootRewriter):
+    def __init__(self, env):
         axioms = [
             env.axioms.plus_comm,
             env.axioms.times_comm,
             env.constants._minus.def_thm.rw(env.axioms.plus_comm)
         ]
-        self.calculator = calculator
-        self.root_rewriter_calc = RootRewriterCalc(env, calculator)
         self.comm_rewriter = RootRewriterList([
             RootRewriterSingle(axiom)
             for axiom in axioms
         ]).to_pattern_rw()
 
     def try_rw(self, term):
-        calc_eq = self.root_rewriter_calc.try_rw(term)
-        if calc_eq is not None: return calc_eq
         if not term.is_const: return None
-        if len(term.args) != 2 or not self.is_number(term[1]): return None
+        if len(term.args) != 2: return None
+        a,b = term.args
+        if b.free_vars or not a.free_vars: return None
         return self.comm_rewriter.try_rw(term)
-
-    def is_number(self, term):
-        if not term.is_const: return False
-        if term.f.arity > 0: return False
-        value = self.calculator.get_term_value(term)
-        return isinstance(value, MathNumber)
 
 class SimplifyLet(RootRewriter):
     def __init__(self, let_const):
@@ -267,7 +258,6 @@ class SimpRewriter(RootRewriterList):
         simp_axioms.append(ax.plus_to_double)
         simp_axioms.append(ax.times_to_square)
         minus_ax = tenv.env.add_axiom("(-1)*X = -X")
-        minus_ax = minus_ax.rw(tenv.env.calculator)
         simp_axioms.append(minus_ax)
 
         for name in ax._core_dict.keys():
@@ -278,7 +268,8 @@ class SimpRewriter(RootRewriterList):
         super().__init__([
             tenv.env.rewriter.to_root_rewriter(*simp_axioms).to_pattern_rw(),
             SimplifyLet(tenv.env.constants.let),
-            PushNumbersLeft(tenv.env, tenv.calculator),
+            PushClosedLeft(tenv.env),
+            RootRewriterCalc(tenv.env, tenv.env.calculator),
             RootRewriterTripack(tenv),
         ])
 
