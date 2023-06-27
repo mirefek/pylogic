@@ -199,8 +199,100 @@ loop(X, 1, a : k : 1 + a + (1+X) * let(a % (1+X), b : BODY(b))) // (1+X)
 
 show_program()
 
+rewrite("""
+(if X%4 = 0 || (X%4 = 3 && !C); a
+ else if X%4 = 3 || (X%4 = 1 && C); b
+ else c)
+=
+(if X%2 = 1 && C; b
+ else if (X+1)%4 < 2; a
+ else c)
+""")
+
+rewrite("""
+sum(1 .. X, b : BODY(b)) = sum(1 .. X//2, b : BODY(2*b)) + sum(1 .. (X+1)//2, b : BODY(2*b-1))
+""", repeat = False)
+rewrite(simp_rewriter)
+rewrite("(2*x)%2 = 0", "((1+2*b)%4 < 2) = (b%2 = 0)", "(-1 + 2*b)%2 = 1", "((2*b) % 4 < 2) = (b%2 = 0)")
+rewrite(simp_rewriter)
+rewrite("(true && X) = X", "(false && X) = false", "(if false; a else b) = b")
+rewrite("(if X%2 = 0; 1 else -1) = (-1)^X")
+
+show_program()
+
+rewrite("sum(1 .. X, a : (-1)^a) = (if X%2 = 0; 1 else 0)-1")
+rewrite(simp_rewriter)
+rewrite("((X // 2) % 2 = 0) = (X % 4 < 2)")
+
+show_program()
+
+rewrite("""
+sum(1..n, a : if PRED(a); 0 else BODY(a) ) =
+sum(1..n, a : BODY(a) ) +
+sum(1..n, a : if PRED(a); -BODY(a) else 0 )
+""")
+rewrite("sum(1 .. X, a : (-1)^a) = (if X%2 = 0; 1 else 0)-1")
+rewrite(simp_rewriter)
+rewrite("((X // 2) % 2 = 0) = (X % 4 < 2)")
+
+show_program()
+
+rewrite("sum(A..B, x : BODY(x)) = sum(-1+A..-1+B, x : BODY(1+x))", repeat = False)
+rewrite("a*(b+c) = a*b + a*c")
+rewrite(simp_rewriter)
+rewrite("-(-1)^(1+n) = (-1)^n")
+rewrite("a + b//c = (a*c+b)//c")
+rewrite(simp_rewriter)
+
+show_program()
+
+rewrite("""sum(S..(-1+X)//2, a:BODY(a)) =
+(if X%2 = 0; -BODY(X//2) else 0) +
+sum(S..X//2, a:BODY(a))
+""")
+
+show_program()
+
+rewrite("- (if C; a else b) = (if C; -a else -b)")
+rewrite("2 * (X // 2) = X") # under a context where we know X is even
+rewrite("n%n = 0")
+rewrite(simp_rewriter)
+rewrite("(if true; a else b) = a")
+rewrite("(-1) + (if C; a else b) = (if C; a-1 else b-1)")
+
+show_program()
+
+rewrite("""
+(if (1+X) % 4 < 2; a else b)
+= (if X%4 = 0; a else if X%4 = 1; b else if X%4 = 2; b else a)
+""")
+rewrite("""
+(if X % 4 < 2; a else b)
+= (if X%4 = 0; a else if X%4 = 1; a else if X%4 = 2; b else b)
+""")
+rewrite("""
+(if X%2 = 0; a else b)
+= (if X%4 = 0; a else if X%4 = 1; b else if X%4 = 2; a else b)
+""")
+rewrite("""
+(if X%4 = 0; -(-1)^(X//2) else b)
+= (if X%4 = 0; -1 else b)
+""")
+rewrite("""
+(if X%4 = 2; -(-1)^(X//2) else b)
+= (if X%4 = 2; 1 else b)
+""")
+
+show_program()
+
+rewrite("(if C; a1 else b1) + (if C; a2 else b2) = (if C; a1+a2 else b1+b2)")
+rewrite(simp_rewriter)
+rewrite("(if C; a else a) = a")
+rewrite(simp_rewriter)
+
+
 #rewrite("A+B+B = A+2*B", co.let, "A//B//C = A//(B*C)", tenv.calculator)
 
 #rewrite("loop(A,B,x:y:if PRED(x,y); C else x) = if exists_in(1..A, x:PRED(B,x)); C else B", repeat = False)
-#print("Final program:")
-#show_program()
+print("Final program:")
+show_program()
