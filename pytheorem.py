@@ -59,7 +59,7 @@ class Theorem:
     @property
     def term(self): return self.core_thm.term
     @property
-    def origin(self): return self.core_thm.origin
+    def proof(self): return self.core_thm.proof
     @property
     def free_vars(self): return self.core_thm.free_vars
     @property

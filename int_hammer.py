@@ -1,13 +1,17 @@
-from logic_core import Verifier, CoreTheorem
+from logic_core import Verifier, CoreTheorem, Proof
 from term import Term, TermApp, TermVariable, get_unused_name
 from calc_set_fun import *
 from calc_numbers import CalculationNumbers
 import re
 import subprocess
 
+class ProofIntHammer(Proof):
+    def __init__(self):
+        pass
+
 class AbstractIntHammer(Verifier):
     def __init__(self, core, constants, calculator):
-        super().__init__(core, "int_hammer")
+        super().__init__(core)
 
         self.calculator = calculator
         self.connectives = {
@@ -101,7 +105,8 @@ class AbstractIntHammer(Verifier):
                     formula,
                 )
             )
-        return self._make_thm(dict(), formula)
+        proof = ProofIntHammer()
+        return self._make_thm(dict(), formula, proof)
 
     def formula_to_str(self, formula, var_to_name, debug):
 

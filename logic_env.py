@@ -14,8 +14,8 @@ from calc_set_fun import SetCalculation, FunCalculation, BinderCalculation, Math
 from calc_numbers import CalculationNumbers, math_number_expansion
 
 class LogicEnv:
-    def __init__(self):
-        self.core = LogicCore()
+    def __init__(self, record_proof = False):
+        self.core = LogicCore(record_proof = record_proof)
         self.calculator = Calculator(self.core)
         self.calculator.accept_types(MathSet, MathFun, MathNumber)
         self.parser = TermParser(

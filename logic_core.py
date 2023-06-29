@@ -1,5 +1,36 @@
 from term import Term, TermApp, BVar, TermVariable, TermConstant
 
+class Proof:
+    pass
+
+class ProofAxiom(Proof):
+    def __init__(self, data):
+        self.data = data
+class ProofDefinition(Proof):
+    def __init__(self, defined_constant):
+        self.defined_constant = defined_constant
+
+class ProofModusPonens(Proof):
+    def __init__(self, impl, assump):
+        self.impl = impl
+        self.assump = assump
+class ProofSpecialize(Proof):
+    def __init__(self, thm, subst):
+        self.thm = thm
+        self.subst = subst
+class ProofRelabel(Proof):
+    def __init__(self, thm, label_subst):
+        self.thm = thm
+        self.label_subst = label_subst
+class ProofImplToLabels(Proof):
+    def __init__(self, thm, labels):
+        self.thm = thm
+        self.labels = labels
+class ProofLabelsToImpl(Proof):
+    def __init__(self, thm, labels):
+        self.thm = thm
+        self.labels = labels
+
 class AssumptionLabel:
     def __init__(self, name="?label"):
         self.name = name
@@ -11,15 +42,16 @@ class DefinedConstant(TermConstant):
         self.def_core_thm = None # to be set
 
 class CoreTheorem:
-    def __init__(self, core, assumptions, term, origin, free_vars = None):
+    def __init__(self, core, assumptions, term, proof, age, free_vars = None):
         if not isinstance(core, LogicCore):
             raise Exception("Trying to create a core theorem without a logic core")
         if not core._creating_theorem:
             raise Exception("Core theorem can be only built using a logic core")
+        self._age = age
         self._core = core
         self._assumptions = assumptions
         self._term = term
-        self._origin = origin
+        self._proof = proof
         if free_vars is None:
             free_vars = set(self._term.free_vars)
             for aterm in assumptions.values():
@@ -27,9 +59,11 @@ class CoreTheorem:
         self._free_vars = frozenset(free_vars)
 
     @property
+    def age(self): return self._age
+    @property
     def term(self): return self._term
     @property
-    def origin(self): return self._origin
+    def proof(self): return self._proof
     @property
     def free_vars(self): return self._free_vars
     @property
@@ -69,8 +103,8 @@ class CoreTheorem:
             for label, aterm in other.assump_items():
                 self._add_to_assumptions(assumptions, label, aterm)
         term = self._term.args[1]
-        origin = "modus_ponens", self, other
-        return self._core._make_thm(assumptions, term, origin)
+        proof = ProofModusPonens(self, other)
+        return self._core._make_thm(assumptions, term, proof)
 
     def specialize(self, subst):
         for v,t in subst.items():
@@ -87,8 +121,8 @@ class CoreTheorem:
         if assumptions == self._assumptions:
             assumptions = self._assumptions
         term = self._term.substitute_free(subst)
-        origin = "specialize", tuple(subst.items())
-        return self._core._make_thm(assumptions, term, origin)
+        proof = ProofSpecialize(self, tuple(subst.items()))
+        return self._core._make_thm(assumptions, term, proof)
 
     def relabel(self, label_subst):
         for label, label_new in label_subst.items():
@@ -99,8 +133,8 @@ class CoreTheorem:
             label_new = label_subst.get(label, label)
             self._add_to_assumptions(assumptions, label_new, aterm)
         term = self._term
-        origin = "relabel", tuple(label_subst.items())
-        return self._core._make_thm(assumptions, term, origin, self._free_vars)
+        proof = ProofRelabel(self, tuple(label_subst.items()))
+        return self._core._make_thm(assumptions, term, proof, self._free_vars)
 
     def impl_to_labels(self, *labels):
         assert all(isinstance(label, AssumptionLabel) for label in labels)
@@ -114,8 +148,8 @@ class CoreTheorem:
             aterm = term.args[0]
             term = term.args[1]
             self._add_to_assumptions(assumptions, label, aterm)
-        origin = "impl_to_labels", tuple(labels)
-        return self._core._make_thm(assumptions, term, origin, self._free_vars)
+        proof = ProofImplToLabels(self, tuple(labels))
+        return self._core._make_thm(assumptions, term, proof, self._free_vars)
 
     def labels_to_impl(self, *labels):
         for label in labels:
@@ -130,8 +164,8 @@ class CoreTheorem:
         term = self._term
         for label in reversed(labels):
             term = TermApp(self._core.implication, (self.assumption(label), term))
-        origin = "labels_to_impl", tuple(labels)
-        return self._core._make_thm(assumptions, term, origin, self._free_vars)
+        proof = ProofLabelsToImpl(self, tuple(labels))
+        return self._core._make_thm(assumptions, term, proof, self._free_vars)
 
     def to_str(self):
         res_strs = [
@@ -152,21 +186,27 @@ class LogicCore:
         self._creating_theorem = False
         self._trusted = set()
         self._record_proof = record_proof
+        self._last_age = 0
 
-    def _make_thm(self, assumptions, term, origin, free_vars = None):
+    def _make_thm(self, assumptions, term, proof, free_vars = None):
         self._creating_theorem = True
-        if not self._record_proof: origin = "unrecorded"
-        thm = CoreTheorem(self, assumptions, term, origin, free_vars)
+        if not self._record_proof: proof = None
+        self._last_age += 1
+        thm = CoreTheorem(self, assumptions, term, proof, self._last_age, free_vars)
         self._creating_theorem = False
         return thm
+
+    @property
+    def last_age(self):
+        return self._last_age
 
     def add_axiom(self, axiom, axiom_data):
         if self._strict_mode:
             raise Exception("Cannot add axioms in strict mode")
         assert isinstance(axiom, Term)
         assert axiom.is_closed
-        origin = "axiom", axiom_data
-        return self._make_thm(dict(), axiom, origin)
+        proof = ProofAxiom(axiom_data)
+        return self._make_thm(dict(), axiom, proof)
 
     def add_trusted_verifier(self, verifier):
         self._trusted.add(verifier)
@@ -196,18 +236,16 @@ class LogicCore:
                 body,
             )
         )
-        origin = "definition", f
-        thm = self._make_thm(dict(), def_term, origin, frozenset(var_set))
+        proof = ProofDefinition(f)
+        thm = self._make_thm(dict(), def_term, proof, frozenset(var_set))
         f.def_core_thm = thm
         return f
 
 class Verifier:
-    def __init__(self, core, name = "verifier"):
+    def __init__(self, core):
         self.core = core
-        self.name = name
         core.add_trusted_verifier(self)
-    def _make_thm(self, assumptions, term, data = None):
+    def _make_thm(self, assumptions, term, proof):
         core = self.core
         assert self in core._trusted
-        origin = self.name, data
-        return self.core._make_thm(assumptions, term, origin)
+        return self.core._make_thm(assumptions, term, proof)

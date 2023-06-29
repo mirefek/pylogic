@@ -5,7 +5,11 @@ from weakref import WeakValueDictionary, WeakSet
 from term import Term, TermApp, BVar, TermVariable, TermConstant, get_unused_name
 from share_term import TermCache
 import subprocess
-from logic_core import Verifier, CoreTheorem
+from logic_core import Verifier, CoreTheorem, Proof
+
+class ProofFofHammer(Proof):
+    def __init__(self, used_axioms):
+        self.used_axioms = used_axioms
 
 class HigherOrderStatement:
     def __init__(self, term, metadata, exporter):
@@ -559,7 +563,7 @@ class FirstOrderToTPTPConfig:
 
 class FofHammer(Verifier):
     def __init__(self, core, constants, solver_cmd, instantiation_limit = 24):
-        super().__init__(core, "fof_hammer")
+        super().__init__(core)
         self._to_fof_config = HigherToFirstOrderConfig(constants, instantiation_limit)
         self._tptp_config = FirstOrderToTPTPConfig(constants)
         self._c_is_bool = constants["_is_bool", (0,)]
@@ -652,8 +656,8 @@ class FofHammer(Verifier):
         for axiom in used_axioms:
             for label, assump in axiom.assump_items():
                 label_to_assump.set_default(label, assump)
-        origin = used_axioms
-        return self._make_thm(label_to_assump, goal, origin)
+        proof = ProofFofHammer(used_axioms)
+        return self._make_thm(label_to_assump, goal, proof)
 
     @staticmethod
     def var_to_const(term, vs, var_to_const_d):

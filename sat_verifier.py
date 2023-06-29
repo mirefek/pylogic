@@ -1,11 +1,14 @@
 from term import TermConstant
-from logic_core import Verifier
+from logic_core import Verifier, Proof
 from pysat.solvers import Solver
 from share_term import term_to_instr_list
 
+class ProofSatSolver(Proof):
+    pass
+
 class SatVerifier(Verifier):
     def __init__(self, core):
-        super().__init__(core, "sat_verifier")
+        super().__init__(core)
         self._const_to_clause_gen = {
             core.implication : lambda x,y,res: [(x,res), (-y,res), (-x,y,-res)]
         }
@@ -86,7 +89,8 @@ class SatVerifier(Verifier):
                         print(int(value), ':', t)
                     raise Exception("SAT checked term is not generally propositionally true")
             else: # no counterexample -> theorem
-                return self._make_thm(dict(), term)
+                proof = ProofSatSolver()
+                return self._make_thm(dict(), term, proof)
 
 if __name__ == "__main__":
     from parse_term import TermParser

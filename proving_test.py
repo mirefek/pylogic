@@ -1,11 +1,46 @@
 from logic_env import LogicEnv
 from tactics import apply_spec, Intros, PatternLookupGoal, ApplyExact, BasicTactic
 from term import Term, BVar, TermApp, TermVariable, get_unused_name
-from logic_core import AssumptionLabel
+from logic_core import CoreTheorem, AssumptionLabel, ProofSpecialize, ProofRelabel, ProofImplToLabels, ProofLabelsToImpl, ProofModusPonens, ProofAxiom, ProofDefinition
 from pytheorem import Theorem, Resolver
-from pattern_lookup import PatternLookupRewrite
+from pattern_lookup import PatternLookupRewrite    
+import numpy as np
 
-env = LogicEnv()
+def get_node_basic_size(core_thm, last_age):
+    types = [
+        ProofAxiom, ProofDefinition,
+        ProofSpecialize, ProofRelabel, ProofImplToLabels, ProofLabelsToImpl,
+        ProofModusPonens,
+    ]
+    res = np.zeros(len(types)+2, dtype = int)
+    proof_type = type(core_thm.proof)
+    if core_thm.age <= last_age: res[0] += 1
+    elif type(proof_type in types): res[types.index(proof_type)+1] += 1
+    else: res[-1] += 1
+    return res
+
+def get_proof_size_aux(core_thm, cache, last_age):
+    if core_thm in cache: return cache[core_thm]
+    proof = core_thm.proof
+    res = get_node_basic_size(core_thm, last_age)
+    if core_thm.age > last_age:
+        if isinstance(proof, (ProofSpecialize, ProofRelabel, ProofImplToLabels, ProofLabelsToImpl)):
+            res += get_proof_size_aux(proof.thm, cache, last_age)
+        elif isinstance(proof, ProofModusPonens):
+            res += get_proof_size_aux(proof.impl, cache, last_age)
+            res += get_proof_size_aux(proof.assump, cache, last_age)
+    cache[core_thm] = res
+    return res
+
+def get_proof_size(thm, last_age = 0):
+    if isinstance(thm, Theorem): thm = thm.core_thm
+    assert isinstance(thm, CoreTheorem)
+    cache = dict()
+    tree_size = get_proof_size_aux(thm, cache, last_age)
+    dag_size = sum(get_node_basic_size(x, last_age) for x in cache.keys())
+    return np.stack([dag_size, tree_size])
+
+env = LogicEnv(record_proof = True)
 g = env.goal_env
 co = env.constants
 axiom = env.axioms
@@ -1693,6 +1728,8 @@ with g.goal("f is_injective => f[X] != null => f[X] = f[Y] => X = Y"):
     g.exact(x(fxfy))
 injective_cancel_nn = g.last_proven    
 
+last_age = env.core.last_age
+
 with g.goal("""
   f is_injective => g is_injective =>
   image(f) <:= domain(g) => image(g) <:= domain(f) =>
@@ -1973,3 +2010,8 @@ cantor_bernstein = cantor_bernstein.alpha_equiv_exchange(
 )
 print("Cantor Bernstein:")
 print(cantor_bernstein)
+
+print("proof size:")
+sizes = get_proof_size(cantor_bernstein, last_age=0)
+print(sizes)
+print("total:", np.sum(sizes, axis = 1))

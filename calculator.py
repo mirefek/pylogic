@@ -1,7 +1,10 @@
 from term import TermConstant, TermVariable, Term, TermApp, BVar
-from logic_core import Verifier
+from logic_core import Verifier, Proof
 from share_term import term_to_instr_list
 import inspect
+
+class ProofCalculator(Proof):
+    pass
 
 class ContainerValue:
     def __init__(self):
@@ -77,7 +80,7 @@ class CalcStep(CalcTerm):
 
 class Calculator(Verifier):
     def __init__(self, core):
-        super().__init__(core, "calculator")
+        super().__init__(core)
         self._const_to_term = dict()
         self._interpretation = {
             core.implication : (lambda x,y: not x() or y()),
@@ -177,7 +180,8 @@ class Calculator(Verifier):
 
         res = self.get_value_term(val)
         res = TermApp(self.core.equality, (term, res))
-        return self._make_thm(dict(), res)
+        proof = ProofCalculator()
+        return self._make_thm(dict(), res, proof)
 
     def add_functions(self, constant_dict, *function_modules, prefix = "calc_"):
         for function_module in function_modules:
