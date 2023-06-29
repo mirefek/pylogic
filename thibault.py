@@ -124,7 +124,7 @@ class ThibaultEnv:
     def add_calc_term_aux(self,
             aterm : AnnotatedTerm,
             cterm : CalcTerm,
-            fvs : list[TermVariable],
+            fvs : list, # list[TermVariable],
     ):
         aterm.calc_fvs = fvs
         aterm.calc_term = cterm
