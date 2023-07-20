@@ -1,6 +1,6 @@
 from term import TermConstant, TermVariable, Term, TermApp, BVar
 from logic_core import Verifier, Proof
-from share_term import term_to_instr_list
+from share_term import TermCache
 import inspect
 
 class ProofCalculator(Proof):
@@ -145,22 +145,20 @@ class Calculator(Verifier):
         self._const_to_term[value] = term
         return term
 
-    def build_calc_term(self, term):
-        instr_list, terms = term_to_instr_list(term)
-        calc_terms = []
-        for f_args in instr_list:
-            f = f_args[0]
-            if isinstance(f, int):
-                calc_terms.append(CalcBvar(f))
-            else:
-                if isinstance(f, TermVariable):
-                    raise Exception(f"Cannot calculate variable '{f}' (in '{term}')")
-                f_repr = self._interpretation.get(f, None)
-                if f_repr is None:
-                    raise Exception(f"Calculator: constant '{f}' doesn't have an interpretation")
-                args = [calc_terms[i] for i in f_args[1:]]
-                calc_terms.append(CalcStep(f_repr, f.signature, args))
-        return calc_terms[-1]
+    def build_calc_term(self, term, cache):
+        res = cache.get(term)
+        if res is not None: return res
+        if isinstance(term, BVar): res = CalcBvar(term.debruijn_height)
+        else:
+            if isinstance(term.f, TermVariable):
+                raise Exception(f"Cannot calculate variable '{term.f}' (in '{term}')")
+            f_repr = self._interpretation.get(term.f)
+            if f_repr is None:
+                raise Exception(f"Calculator: constant '{term.f}' doesn't have an interpretation")
+            args = [self.build_calc_term(arg, cache) for arg in term.args]
+            res = CalcStep(f_repr, term.f.signature, args)
+        cache[term] = res
+        return res
     
     def calculate(self, term, only_try = False):
         if not term.is_closed:
@@ -168,7 +166,8 @@ class Calculator(Verifier):
             else: raise Exception(f"Calculated term '{term}' is not closed")
 
         try:
-            calc_term = self.build_calc_term(term)
+            term = TermCache().share(term)
+            calc_term = self.build_calc_term(term, dict())
         except Exception:
             if only_try: return None
             else: raise

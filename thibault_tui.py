@@ -160,8 +160,8 @@ class ThibaultTui:
 
     def on_key(self, key):
         y,x = self.scr.getmaxyx()
-        self.scr.addstr(y-1,x-len(key)-1,key)
-        if key == 'q':
+        self.scr.addstr(y-1,x-len(repr(key))-1,repr(key))
+        if key in ('q', '\x1b'):
             self._running = False
         elif key == 'KEY_DOWN':
             if self.hl_subterm.subterms:
@@ -211,4 +211,4 @@ if __name__ == "__main__":
         sum(1 .. X, b : if b % 4 = 0 || (b % 4 = 3 && ! ((1 + X) % b = 0)) ; 1 else if b % 4 = 3 || (b % 4 = 1 && (1 + X) % b = 0) ; 0 else - 1) + 1
         """)
         return term
-    curses.wrapper(ThibaultTui, tenv, make_term2())
+    curses.wrapper(ThibaultTui, tenv, make_term_motzkin())

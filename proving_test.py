@@ -2012,6 +2012,6 @@ print("Cantor Bernstein:")
 print(cantor_bernstein)
 
 print("proof size:")
-sizes = get_proof_size(cantor_bernstein, last_age=0)
+sizes = get_proof_size(cantor_bernstein, last_age)
 print(sizes)
 print("total:", np.sum(sizes, axis = 1))
