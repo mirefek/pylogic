@@ -97,7 +97,7 @@ if __name__ == "__main__":
     TWO = parser.int_to_term(2)
     plus = parser.name_signature_to_const["_plus", (0,0)]
     fun_on = parser.name_signature_to_const["fun_on", (0,1)]
-    loop = parser.name_signature_to_const["loop", (2,0,0)]
+    loop = parser.name_signature_to_const["loop", (0,0,2)]
     _int_range = parser.name_signature_to_const["_int_range", (0,0)]
     def int_range(a,b):
         return _int_range(parser.int_to_term(a), parser.int_to_term(b))
@@ -105,52 +105,47 @@ if __name__ == "__main__":
     print(calculator.calculate(
         fun_on(
             int_range(0,10),
-            lambda x : loop(lambda x,y: plus(x,x), x, ONE)
+            lambda x : loop(x, ONE, lambda x,y: plus(x,x))
         )
     ))
     
     print(calculator.calculate(tt("""
 fun_on(0..10, x :
-  loop2(
-    x:y: loop(
+  loop2(x,1, 1 + (((x * x) + x) // 2),
+    x:y:z: loop(1,y,
       x:y: loop(
-        x:y: (((1 + 2) * (x * y)) // (2 + y)) + x,
 	loop(
-	  x:y: x - cond(y - x, y, 0),
 	  2 + (x // (1 + (2 + 2))),
-	  x
+	  x,
+	  x:y: x - cond(y - x, y, 0)
 	),
         loop2(
-	  x:y: x * y,
-	  x:y: 1 + y,
-	  0 - loop(
-	    x:y: x - cond(x, 0, 1 + y),
+    	  0 - loop(
 	    2 + (x // (1 + (2 + 2))),
-	    x
+	    x,
+	    x:y: x - cond(x, 0, 1 + y)
 	  ),
 	  1,
 	  1 + loop(
-	    x:y: x - cond(y - x, y, 0),
 	    2 + (x // (1 + (2 + 2))),
-	    x
-	  )
-	)
-      ) // loop(
-        x:y: x * y,
-	0 - loop(
-	  x:y: x - cond(x, 0, 1 + y),
-	  2 + (x // (1 + (2 + 2))),
-	  x
+	    x,
+	    x:y: x - cond(y - x, y, 0)
+	  ),
+	  x:y:z: x * y,
+	  x:y:z: 1 + y
 	),
-	1
-      ),
-      1,
-      y
+        x:y: (((1 + 2) * (x * y)) // (2 + y)) + x
+      ) // loop(
+	0 - loop(
+	  2 + (x // (1 + (2 + 2))),
+	  x,
+	  x:y: x - cond(x, 0, 1 + y)
+	),
+	1,
+        x:y: x * y
+      )
     ) - x,
-    x:y: 1 + y,
-    x,
-    1,
-    1 + (((x * x) + x) // 2)
+    x:y:z: 1 + y
   )
 )
 """)))
