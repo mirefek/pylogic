@@ -1,5 +1,18 @@
 import curses
 
+KEY_LEFT = "KEY_LEFT"
+KEY_RIGHT = "KEY_RIGHT"
+KEY_BACKSPACE = "\x08"
+KEY_DELETE = "KEY_DC"
+KEY_CTRL_LEFT = "kLFT5"
+KEY_CTRL_RIGHT = "kRIT5"
+KEY_CTRL_BACKSPACE = "KEY_BACKSPACE"
+KEY_HOME = "KEY_HOME"
+KEY_END = "KEY_END"
+KEY_ENTER = "\n"
+KEY_TAB = "\t"
+KEY_F10 = "KEY_F(10)"
+
 class LineEdit:
     def __init__(self, scr, win_y = -1, win_x = 0, win_width = 0):
         if win_width <= 0 or win_y < 0 or win_x < 0:
@@ -156,19 +169,19 @@ class LineEdit:
     def loop(self):
         while True:
             c = self.scr.getkey()
-            if c == "KEY_RIGHT": self.cursor += 1
-            elif c == "KEY_LEFT": self.cursor -= 1
-            elif c == "\x08": self.delete(self.cursor-1, self.cursor) # backspace
-            elif c == "KEY_DC": self.delete(self.cursor, self.cursor+1) # delete
-            elif c == "kLFT5": self.cursor = self.jump_left() # ctrl-left
-            elif c == "kRIT5": self.cursor = self.jump_right() # ctrl-right
-            elif c == "KEY_BACKSPACE": self.delete(self.jump_left(), self.cursor) # ctrl-backspace
-            elif c == "KEY_HOME": self.cursor = 0
-            elif c == "KEY_END": self.cursor = len(self._data)
-            elif c == '\t':
+            if c == KEY_RIGHT: self.cursor += 1
+            elif c == KEY_LEFT: self.cursor -= 1
+            elif c == KEY_BACKSPACE: self.delete(self.cursor-1, self.cursor)
+            elif c == KEY_DELETE: self.delete(self.cursor, self.cursor+1)
+            elif c == KEY_CTRL_LEFT: self.cursor = self.jump_left()
+            elif c == KEY_CTRL_RIGHT: self.cursor = self.jump_right()
+            elif c == KEY_CTRL_BACKSPACE: self.delete(self.jump_left(), self.cursor)
+            elif c == KEY_HOME: self.cursor = 0
+            elif c == KEY_END: self.cursor = len(self._data)
+            elif c == KEY_TAB:
                 if self._highlight is not None: self.cursor = self._highlight
-            elif c == '\n': return self.data
-            elif c == 'KEY_F(10)': return None # escape
+            elif c == KEY_ENTER: return self.data
+            elif c == KEY_F10: return None # escape
             elif len(c) == 1 and c.isprintable(): self.insert(c)
 
 if __name__ == "__main__":
