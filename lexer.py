@@ -1,23 +1,39 @@
 import re
 
-def show_in_line(line, start, end = None, lineno = None):
-    if end is None: l = 1
-    else: l = end-start
-    if lineno is not None:
-        line_desc = "{}:".format(lineno)
-        start += len(line_desc)
-        line = line_desc+line
-    if line.endswith('\n'): line = line[:-1]
-    print(line)
-    print(' '*start+'^'*l)
-
 class Token:
     def __init__(self, name, t):
         self.name = name
         self.t = t
-    def show_in_line(self):
-        show_in_line(self.line, self.start, self.end, self.lineno)
 
+class ErrorInLine(Exception):
+    def __init__(self, exc, line_or_token, start = None, end = None, lineno = None):
+        self.exc = exc
+        if isinstance(line_or_token, Token):
+            token = line_or_token
+            self.line = token.line
+            self.start = token.start
+            self.l = token.end - token.start
+            self.lineno = token.lineno
+        else:
+            self.line = line_or_token
+            self.start = start
+            if end is None: self.l = 1
+            else: self.l = end - start
+            self.lineno = lineno
+
+    def line_str(self):
+        start = self.start
+        line = self.line
+        if self.lineno is not None:
+            line_desc = "{}:".format(self.lineno)
+            start += len(line_desc)
+            line = line_desc+line
+        if line.endswith('\n'): line = line[:-1]
+        return line+'\n'+' '*start+'^'*self.l
+
+    def __str__(self):
+        return str(self.exc) + '\n' + self.line_str()
+    
 class Lexer:
     def __init__(self):
         self.literals = set()
@@ -64,8 +80,7 @@ class Lexer:
 
             if token_end is None:
                 if fname is not None: print("File:", fname)
-                show_in_line(line, i, lineno = lineno)
-                raise Exception("Lexer: Unknown token")
+                raise ErrorInLine("Lexer: Unknown token", line, i, lineno = lineno)
 
             token = Token(line[i:token_end], token_type)
             if token.name in self.line_comments: return
@@ -85,6 +100,3 @@ if __name__ == "__main__":
     lexer.add_literal('exists')
     lexer.add_literal('exists!')
     lexer.set_line_comment('#')
-
-    for token in lexer.parse_line("X existsuje exists! - 14 => 13b # - a13", lineno = 123):
-        token.show_in_line()

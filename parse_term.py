@@ -16,6 +16,7 @@ class TermParser:
         self.cur_fname = None
         self.int_to_term = int_to_term
         self.verbose = False
+        self.available_vars = None
 
         parenth = self.add_syntax_rule(SyntaxBasic(
             '(', None, ')',
@@ -41,18 +42,29 @@ class TermParser:
         return self.syntax_parser.add_rule(rule, **kwargs)
     def syntax_state(self):
         return self.parser_to_tree.ini_state()
-    def syntax_tree_to_term(self, syntax_tree, introduce_constant = False, with_binders = False):
-        self.depth = 0
-        self.local_context = dict()
+    def syntax_tree_to_term(self, syntax_tree, introduce_constant = False, with_binders = False, local_context = None, available_vars = None):
+
+        if local_context is None: self.local_context = dict()
+        elif isinstance(local_context, dict): self.local_context = dict(local_context)
+        else: self.local_context = {name:i for i,name in enumerate(local_context)}
+
+        if not self.local_context: self.depth = 0
+        else: self.depth = max(self.local_context.values())+1
+
         self.introduce_constant = introduce_constant
+        if available_vars is not None: self.available_vars = set(available_vars)
         self.new_constant = None
+
         if with_binders: bound_names, res = self._binder_tree_to_term(syntax_tree)
         else: res = self.tree_to_term(syntax_tree)
+
         del self.depth
         del self.local_context
         del self.introduce_constant
+        self.available_vars = None
         new_constant = self.new_constant
         del self.new_constant
+
         if introduce_constant:
             if with_binders:
                 return bound_names, res, new_constant
@@ -69,7 +81,7 @@ class TermParser:
     def _nulary_const_or_var(self, token):
         if token.name.isdigit():
             if self.int_to_term is None:
-                raise Exception("Numbers not supported, missing conversion to term")
+                raise ErrorInLine("Numbers not supported, missing conversion to term", token)
             else:
                 return self.int_to_term(int(token.name))
         bvi = self.local_context.get(token.name, None)
@@ -77,7 +89,8 @@ class TermParser:
             return BVar(self.depth - bvi)
         else:
             x = self._get_const_or_var(token.name, ())
-            assert x is not None
+            if x is None:
+                raise ErrorInLine("No constant / variable available", token)
             return TermApp(x, ())
     def _get_string(self, tree):
         if tree.rule != self.syntax_parser._rule_atom: return None
@@ -118,13 +131,17 @@ class TermParser:
         signature = tuple(len(bn) for bn in bound_names)
         self.introduce_constant = introduce_constant
         f = self._get_const_or_var(fun, signature)
+        if f is None: raise ErrorInLine("No constant / variable available", args[0].args[0])
         self.introduce_constant = False
         res = TermApp(f, term_args, bound_names = bound_names)
         return res
 
     def get_var(self, name, arity):
         v = self.name_arity_to_var.get((name, arity), None)
-        if v is not None: return v
+        if v is not None:
+            if self.available_vars is not None and v not in self.available_vars: return None
+            return v
+        if self.available_vars is not None: return None # 
         v = TermVariable(arity, name = name)
         self.name_arity_to_var[name, arity] = v
         return v
@@ -148,7 +165,7 @@ class TermParser:
         const = self.name_signature_to_const.get((name, signature), None)
         if const is not None: return const
 
-        assert all(x == 0 for x in signature), (name, signature)
+        if not all(x == 0 for x in signature): return None
         return self.get_var(name, len(signature))
 
     def parse_file(self, fname, verbose = False):
@@ -173,12 +190,12 @@ class TermParser:
             for i,line in enumerate(s.split('\n')):
                 syntax_state.parse_line(line,i)
         else:
-            syntax_state.parse_line(s,0)
+            syntax_state.parse_line(s,None)
         syntax_tree = syntax_state.finish()
         [syntax_tree] = syntax_tree.args
         return self.syntax_tree_to_term(syntax_tree, **kwargs)
 
-    def get_header_var_list_(self, term, f):
+    def _get_header_var_list(self, term, f):
         assert term.f == f
         res = []
         res_s = set()
@@ -201,12 +218,12 @@ class TermParser:
         self.const_to_age[c] = age
     def add_constant(self, syntax_tree):
         t,c = self.syntax_tree_to_term(syntax_tree, True)
-        self.get_header_var_list_(t,c)
+        self._get_header_var_list(t,c)
         self.register_constant(c)
     def add_definition(self, header, _, body):
         header,c = self.syntax_tree_to_term(header, True)
-        var_list = self.get_header_var_list_(header,c)
-        body = self.syntax_tree_to_term(body)
+        var_list = self._get_header_var_list(header,c)
+        body = self.syntax_tree_to_term(body, available_vars = var_list)
         assert (c.name, c.signature) not in self.name_signature_to_const
         c = self.logic.add_definition(
             var_list, body,
@@ -403,4 +420,4 @@ if __name__ == "__main__":
     parser.parse_file("axioms_logic", verbose = True)
     parser.parse_file("axioms_set", verbose = True)
     parser.parse_file("axioms_fun", verbose = True)
-    #print(parser.parse_str("A = B = C"))
+    print(parser.parse_str("A = null", available_vars = ()))

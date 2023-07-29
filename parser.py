@@ -1,4 +1,4 @@
-from lexer import Token, Lexer
+from lexer import Token, Lexer, ErrorInLine
 
 class SyntaxTree:
     def __init__(self, rule, args):
@@ -327,10 +327,7 @@ class ParserState:
                 if next_rule.can_take_object(next_objects):
                     next_objects.append(objects.pop())
                 if not next_rule.can_take_token(next_objects, token):
-                    token.show_in_line()
-                    print(next_rule.elements)
-                    print(next_rule.accepts_modified)
-                    raise Exception
+                    raise ErrorInLine("Next rule cannot take token", token)
                 next_objects.append(token)
                 self.stack.append((next_rule, next_objects))
                 break
@@ -343,11 +340,9 @@ class ParserState:
                 break
 
             if not self.stack:
-                token.show_in_line()
-                raise Exception()
+                raise ErrorInLine("Stack is not empty", token)
             if not rule.should_pack(objects, token):
-                token.show_in_line()
-                raise Exception()
+                raise ErrorInLine("Preliminary closure of a rule", token)
             obj = SyntaxTree(rule, objects)
             self.stack.pop()
             rule, objects = self.stack[-1]
