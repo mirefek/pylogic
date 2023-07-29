@@ -21,7 +21,6 @@ class LineEdit:
             if win_x < 0: win_x += width
             if win_width <= 0: win_width += width - win_x
         self.scr = scr
-        self.win = curses.newwin(1,win_width,win_y,win_x)
         self._data = []
         self._shift = 0
         self._win_y = win_y
@@ -49,28 +48,29 @@ class LineEdit:
     def data(self):
         return ''.join(self._data)
 
+    def _clear(self):
+        self.scr.addstr(self._win_y, self._win_x-2, ' '*(self._win_width+3))
+        self.scr.insch(self._win_y, self._win_x + self._win_width+1, ' ')
+
     def _draw(self, force = False):
         if not (self._updated or force): return
         s = ''.join(self._data[self._shift:self._shift+self._win_width])
-        self.win.clear()
+        self._clear()
         if self._highlight is not None and 0 <= self._highlight-self._shift < self._win_width:
             hli = self._highlight-self._shift
-            # self.scr.addstr(10,10, f"draw HL '{s}' {hli}    ")
-            self.win.addstr(0,2,s[:hli])
-            self.win.addstr(s[hli], curses.A_UNDERLINE)
-            self.win.addstr(s[hli+1:])
+            self.scr.addstr(self._win_y,self._win_x,s[:hli])
+            self.scr.addstr(s[hli], curses.A_UNDERLINE)
+            self.scr.addstr(s[hli+1:])
         else:
-            # self.scr.addstr(10,10, f"draw normal '{s}'    ")
-            self.win.addstr(0,2,s)
+            self.scr.addstr(self._win_y, self._win_x,s)
+
         if self._shift > 0:
-            self.win.addstr(0,0,'<')
+            self.scr.addch(self._win_y,self._win_x-2,'<')
+        else:
+            self.scr.addch(self._win_y,self._win_x-2,'>')
         if self._shift < len(self._data) - self._win_width:
-            try:
-                self.win.addstr(0,2+self._win_width+1,'>')
-            except curses.error:
-                pass
+            self.scr.insch(self._win_y,self._win_x+self._win_width+1,'>')
         self._set_cursor()
-        self.win.refresh()
         self._updated = False
 
     def _set_cursor(self):
@@ -168,6 +168,7 @@ class LineEdit:
 
     def loop(self):
         while True:
+            self.scr.refresh()
             c = self.scr.getkey()
             if c == KEY_RIGHT: self.cursor += 1
             elif c == KEY_LEFT: self.cursor -= 1
@@ -188,6 +189,7 @@ if __name__ == "__main__":
     def main(scr):
         global res
         line_edit = LineEdit(scr)
+
         res = line_edit.loop()
 
     curses.wrapper(main)
