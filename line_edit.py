@@ -15,11 +15,11 @@ KEY_F10 = "KEY_F(10)"
 
 class LineEdit:
     def __init__(self, scr, win_y = -1, win_x = 0, win_width = 0):
+        scr_height, scr_width = scr.getmaxyx()
         if win_width <= 0 or win_y < 0 or win_x < 0:
-            height,width = scr.getmaxyx()
-            if win_y < 0: win_y += height
-            if win_x < 0: win_x += width
-            if win_width <= 0: win_width += width - win_x
+            if win_y < 0: win_y += scr_height
+            if win_x < 0: win_x += scr_width
+            if win_width <= 0: win_width += scr_width - win_x
         self.scr = scr
         self._data = []
         self._shift = 0
@@ -29,6 +29,7 @@ class LineEdit:
         self._updated = False
         self._cursor = 0
         self._highlight = None
+        self._touching_right = self._win_x + self._win_width + 2 == scr_width
         self._draw(True)
 
     @property
@@ -49,8 +50,11 @@ class LineEdit:
         return ''.join(self._data)
 
     def _clear(self):
-        self.scr.addstr(self._win_y, self._win_x-2, ' '*(self._win_width+3))
-        self.scr.insch(self._win_y, self._win_x + self._win_width+1, ' ')
+        if self._touching_right:
+            self.scr.addstr(self._win_y, self._win_x-2, ' '*(self._win_width+3))
+            self.scr.insch(self._win_y, self._win_x + self._win_width+1, ' ')
+        else:
+            self.scr.addstr(self._win_y, self._win_x-2, ' '*(self._win_width+4))
 
     def _draw(self, force = False):
         if not (self._updated or force): return
@@ -69,7 +73,10 @@ class LineEdit:
         else:
             self.scr.addch(self._win_y,self._win_x-2,'>')
         if self._shift < len(self._data) - self._win_width:
-            self.scr.insch(self._win_y,self._win_x+self._win_width+1,'>')
+            if self._touching_right:
+                self.scr.insch(self._win_y,self._win_x+self._win_width+1,'>')
+            else:
+                self.scr.addch(self._win_y,self._win_x+self._win_width+1,'>')
         self._set_cursor()
         self._updated = False
 
