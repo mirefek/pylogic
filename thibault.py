@@ -13,10 +13,6 @@ from rewriter import RootRewriter, RootRewriterSingle, RootRewriterList, RootRew
 from share_term import TermCache
 from annotated_term import AnnotatedTerm
 
-class FakeCache: # to avoid any sharing in calculation tree
-    def get(self, key): return None
-    def __setitem__(self, key, value): pass
-
 class ThibaultEnv:
     def __init__(self):
         self.env = LogicEnv()
@@ -124,35 +120,6 @@ class ThibaultEnv:
                 self.X : self.parser.int_to_term(x)
             })
         )
-
-    def add_calc_term_aux(self,
-            aterm : AnnotatedTerm,
-            cterm : CalcTerm,
-            fvs : list, # list[TermVariable],
-    ):
-        aterm.calc_fvs = fvs
-        aterm.calc_term = cterm
-        if aterm.subterms:
-            for asub, csub in zip(aterm.subterms, cterm.args):
-                self.add_calc_term_aux(asub, csub, fvs)
-
-    def add_calc_term(self, aterm : AnnotatedTerm):
-        fvs = aterm.term.get_ordered_free_vars()
-        assert all(fv.arity == 0 for fv in fvs)
-        term = aterm.term.substitute_free({
-            fv : BVar(len(fvs)-i) for i,fv in enumerate(fvs)
-        })
-        calc_term = self.env.calculator.build_calc_term(term, FakeCache())
-        self.add_calc_term_aux(aterm, calc_term, fvs)
-
-    def eval_aterm(self, aterm : AnnotatedTerm, *args):
-        args = tuple(MathNumber(arg) for arg in reversed(args))
-        try:
-            value = aterm.calc_term.evaluate(args)
-        except AssertionError:
-            return None
-        if isinstance(value, MathNumber): return value.x
-        else: return None
 
 class PushClosedLeft(RootRewriter):
     def __init__(self, env):

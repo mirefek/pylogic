@@ -1,4 +1,5 @@
 from term import Term, TermApp, BVar, get_unused_name
+from calculator import Calculator, CalcTerm
 
 class ATNotation:
     def __init__(self, aterm):
@@ -141,14 +142,23 @@ class ATNotation:
             n += after_size
         self.calculate_str()
 
+class FakeCache: # to avoid any sharing in calculation tree
+    def get(self, key): return None
+    def __setitem__(self, key, value): pass
+
 class AnnotatedTerm:
-    def __init__(self, term, parent = None):
+    def __init__(self, term, parent = None, bound_names = None):
         self.term = term
         if parent is None:
             self.parent, self.parent_i = None, None
             self.new_bound_names = []
-            self.bound_names = []
             self.taken_names = set(fv.name for fv in term.free_vars)
+            if bound_names is None: self.bound_names = []
+            else:
+                self.bound_names = list(bound_names)
+                self.taken_names.update(bound_names)
+                assert len(self.taken_names) == len(term.free_vars) + len(bound_names)
+            assert len(self.bound_names) >= term.debruijn_height
         else:
             self.parent, self.parent_i = parent
             self.new_bound_names = []
@@ -182,6 +192,36 @@ class AnnotatedTerm:
 
     def __str__(self):
         return self.notation.str_cache
+
+    def add_calc_term(self, calculator_or_cterm):
+        if isinstance(calculator_or_cterm, CalcTerm): cterm = calculator_or_cterm
+        elif isinstance(calculator_or_cterm, Calculator):
+            cterm = calculator_or_cterm.build_calc_term(self.term, FakeCache())
+        else: raise Exception(f"Not a Calculator / CalcTerm: {type(calculator_or_cterm)} -- {calculator_or_cterm}")
+        self.calc_term = cterm
+        if self.subterms:
+            for asub, csub in zip(self.subterms, cterm.args):
+                asub.add_calc_term(csub)
+
+    def link_bvars(self, ctx = None):
+        if ctx is None:
+            ctx = []
+            t = self
+            while t is not None:
+                ctx.extend(t for _ in t.new_bound_names)
+                t = t.parent
+            ctx.reverse()
+        if isinstance(self.term, BVar):
+            if self.term.debruijn_height <= len(ctx):
+                self.bvar_link = ctx[len(ctx) - self.term.debruijn_height]
+            else:
+                self.bvar_link = None
+        else:
+            for sub in self.subterms:
+                ori_size = len(ctx)
+                ctx.extend(sub for _ in sub.new_bound_names)
+                sub.link_bvars(ctx)
+                if sub.new_bound_names: del ctx[ori_size:]
 
 if __name__ == "__main__":
     from logic_env import LogicEnv

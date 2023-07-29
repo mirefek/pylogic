@@ -2,6 +2,8 @@ import curses
 from annotated_term import AnnotatedTerm
 from thibault import ThibaultEnv, SimpRewriter
 import itertools
+from calc_numbers import MathNumber
+from term import BVar
 
 class ThibaultTui:
     def __init__(self, stdscr, tenv, term):
@@ -11,19 +13,24 @@ class ThibaultTui:
 
         # prepare AnnotatedTerm
         self.tenv = tenv
-        self.aterm = AnnotatedTerm(term)
+        self.aterm = AnnotatedTerm(
+            term.substitute_free({tenv.X : BVar(1)}),
+            bound_names = ['X']
+        )
         self.aterm.add_notation()
+        self.aterm.link_bvars()
         self.aterm.notation.auto_split_lines()
 
         # evaluate on first 20 elements
-        self.tenv.add_calc_term(self.aterm)
+        self.aterm.add_calc_term(tenv.calculator)
         for n in range(20):
-            self.tenv.eval_aterm(self.aterm, n)
+            self.aterm.calc_term.evaluate((MathNumber(n),))
 
         # prepare TUI
         self.scr = stdscr
         curses.curs_set(False)
         self.hl_subterm = self.aterm
+        self.hl_path = set((self.hl_subterm,))
         self.init_color_pairs()
         self.down_ids = []
 
@@ -58,9 +65,18 @@ class ThibaultTui:
             if i == 0 and aterm.term.is_free_var:
                 if hl_indent is None: attr = self.fvar_color_pair
                 else: attr = self.hl_fvar_color_pair
-            elif isinstance(part, (tuple, int)):
-                if hl_indent is None: attr = self.bvar_color_pair
-                else: attr = self.hl_bvar_color_pair
+            elif isinstance(part, tuple): # binder
+                if hl_indent is not None: attr = self.hl_bvar_color_pair
+                elif part[0] in self.hl_path:
+                    attr = self.fvar_color_pair
+                else: attr = self.bvar_color_pair
+            elif isinstance(part, int): # bound variable
+                if aterm.bvar_link is None or aterm.bvar_link in self.hl_path:
+                    if hl_indent is None: attr = self.fvar_color_pair
+                    else: attr = self.hl_fvar_color_pair
+                else:
+                    if hl_indent is None: attr = self.bvar_color_pair
+                    else: attr = self.hl_bvar_color_pair
             if i > 0:
                 space_lines = atn.spaces[i-1].split('\n')
                 for si,spaces in enumerate(space_lines):
@@ -83,11 +99,10 @@ class ThibaultTui:
         start_y = cur_y+2
 
         # collect header
-        fvs = [(fv.name, True) for fv in aterm.calc_fvs]
-        bvs = [(name,False) for name in aterm.bound_names]
-        n = len(fvs) + len(bvs)
+        bvs = [name for name in aterm.bound_names]
+        n = len(bvs)
         used_vars = [
-            name for i,name in enumerate(fvs+bvs)
+            name for i,name in enumerate(bvs)
             if aterm.calc_term.used_bvars & (1 << (n-i-1))
         ]
 
@@ -112,7 +127,7 @@ class ThibaultTui:
         col_sizes = [max(len(x) for x in col) for col in cols]
         cols = [
             [name]+[pad_left(x,size) for x in col]
-            for col,size,(name,_) in zip(cols, col_sizes, used_vars+[('value',0)])
+            for col,size,name in zip(cols, col_sizes, used_vars+['value'])
         ]
         # align header to center
         col_sizes = [max(len(x) for x in col) for col in cols]
@@ -124,29 +139,12 @@ class ThibaultTui:
 
         for i, row in enumerate(rows):
             if i == 0:
-                attrs = [
-                    [self.bvar_color_pair, self.fvar_color_pair][is_free]
-                    for _,is_free in used_vars
-                ]+[0]
+                attrs = [self.fvar_color_pair]*n + [0]
             else: attrs = [0]*len(row)
             self.scr.move(start_y+i, 0)
             for j,(x,attr) in enumerate(zip(row, attrs)):
                 self.scr.addstr('  ')
                 self.scr.addstr(x, attr)
-        return
-
-        self.scr.move(cur_y, 0)
-        for name,is_free in used_vars:
-            if is_free: attr = self.fvar_color_pair
-            else: attr = self.bvar_color_pair
-            self.scr.addstr(name+' ', attr)
-        cur_y += 1
-        for args, value in cache.items():
-            args = [str(x) for x in args]
-            value = str(value)
-            if cur_y >= max_y: break
-            self.scr.addstr(cur_y, 0, f"{args} -> {value}")
-            cur_y += 1
 
     def loop(self):
         self._running = True
@@ -172,9 +170,11 @@ class ThibaultTui:
                         self.hl_subterm.subterms,
                         key = lambda aterm: len(str(aterm))
                     )
+                self.hl_path.add(self.hl_subterm)
         elif key == 'KEY_UP':
             if self.hl_subterm.parent is not None:
                 self.down_ids.append(self.hl_subterm.parent_i)
+                self.hl_path.remove(self.hl_subterm)
                 self.hl_subterm = self.hl_subterm.parent
         elif key == 'KEY_LEFT':
             if self.hl_subterm.parent is not None:
@@ -182,14 +182,18 @@ class ThibaultTui:
                 parent = self.hl_subterm.parent
                 if i > 0:
                     self.down_ids = []
+                    self.hl_path.remove(self.hl_subterm)
                     self.hl_subterm = parent.subterms[i-1]
+                    self.hl_path.add(self.hl_subterm)
         elif key == 'KEY_RIGHT':
             if self.hl_subterm.parent is not None:
                 i = self.hl_subterm.parent_i
                 parent = self.hl_subterm.parent
                 if i < len(parent.subterms)-1:
                     self.down_ids = []
+                    self.hl_path.remove(self.hl_subterm)
                     self.hl_subterm = parent.subterms[i+1]
+                    self.hl_path.add(self.hl_subterm)
 
 if __name__ == "__main__":
     import os
@@ -211,4 +215,14 @@ if __name__ == "__main__":
         sum(1 .. X, b : if b % 4 = 0 || (b % 4 = 3 && ! ((1 + X) % b = 0)) ; 1 else if b % 4 = 3 || (b % 4 = 1 && (1 + X) % b = 0) ; 0 else - 1) + 1
         """)
         return term
+
+    def make_term_primes():
+        return tenv.env.parser.parse_str("""
+        loop(X,1,
+          x:y: loop(x,x,
+            x:y: (if (x % y) = 0 || x % 2 = 0; x+1 else x)
+          )
+        )
+        """)
+
     curses.wrapper(ThibaultTui, tenv, make_term_motzkin())
