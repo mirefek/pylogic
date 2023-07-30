@@ -174,8 +174,8 @@ class LineEdit:
         return i
 
     def loop(self):
+        cursor_mode = curses.curs_set(1)
         while True:
-            self.scr.refresh()
             c = self.scr.getkey()
             if c == KEY_RIGHT: self.cursor += 1
             elif c == KEY_LEFT: self.cursor -= 1
@@ -188,9 +188,15 @@ class LineEdit:
             elif c == KEY_END: self.cursor = len(self._data)
             elif c == KEY_TAB:
                 if self._highlight is not None: self.cursor = self._highlight
-            elif c == KEY_ENTER: return self.data
-            elif c == KEY_F10: return None # escape
+            elif c == KEY_ENTER:
+                res = self.data
+                break
+            elif c == KEY_F10:
+                res = None # escape
+                break
             elif len(c) == 1 and c.isprintable(): self.insert(c)
+        curses.curs_set(cursor_mode)
+        return res
 
 if __name__ == "__main__":
     def main(scr):
