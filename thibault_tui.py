@@ -4,6 +4,8 @@ from thibault import ThibaultEnv, SimpRewriter
 import itertools
 from calc_numbers import MathNumber
 from term import BVar
+from line_edit import LineEdit
+from lexer import ErrorInLine
 
 class ThibaultTui:
     def __init__(self, stdscr, tenv, term):
@@ -153,12 +155,11 @@ class ThibaultTui:
             self.display_aterm(self.aterm)
             self.display_calc_cache(self.hl_subterm)
             key = self.scr.getkey()
-            self.scr.clear()        
             self.on_key(key)
+            self.scr.clear()
 
     def on_key(self, key):
         y,x = self.scr.getmaxyx()
-        self.scr.addstr(y-1,x-len(repr(key))-1,repr(key))
         if key in ('q', '\x1b'):
             self._running = False
         elif key == 'KEY_DOWN':
@@ -194,6 +195,27 @@ class ThibaultTui:
                     self.hl_path.remove(self.hl_subterm)
                     self.hl_subterm = parent.subterms[i+1]
                     self.hl_path.add(self.hl_subterm)
+        elif key == '\n':
+            self.irewrite()
+
+    def irewrite(self):
+        scr_height, scr_width = self.scr.getmaxyx()
+
+        line_edit = LineEdit(self.scr)
+        while True:
+            res = line_edit.loop()
+            if res is None or res.strip() == '': break
+            try:
+                term = self.tenv.env.parser.parse_str(
+                    res,
+                    local_context = self.hl_subterm.bound_names,
+                    available_vars = ()
+                )
+                break
+            except Exception as e:
+                self.scr.addstr(scr_height-5,0,str(e))
+                if isinstance(e, ErrorInLine):
+                    line_edit.cursor = e.start
 
 if __name__ == "__main__":
     import os
