@@ -110,7 +110,7 @@ class ThibaultEnv:
 
     def eval_closed(self, prog_term):
         calc_term = self.env.calculator.build_calc_term(prog_term)
-        res = calc_term.evaluate(())
+        res = calc_term.evaluate([])
         if not isinstance(res, MathNumber) or res.x % 1 != 0: return None
         return res.x
 

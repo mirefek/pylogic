@@ -29,53 +29,42 @@ class ContainerValue:
         return self.to_str(str)
 
 class CalcTerm:
-    def __init__(self, used_bvars):
+    def __init__(self, term):
         self.cache = dict()
-        self.used_bvars = used_bvars
+        self.used_bvars = sorted(term.bound_vars, reverse = True)
     def evaluate_raw(self, bvar_values):
         raise Exception("Not implemented")
     def evaluate(self, bvar_values):
-        key = tuple(
-            v for i,v in enumerate(bvar_values)
-            if self.used_bvars & (1 << i)
-        )
+        key = tuple(bvar_values[-i] for i in self.used_bvars)
         if key in self.cache: return self.cache[key]
-        assert not (self.used_bvars >> (len(bvar_values)))
         res = self.evaluate_raw(bvar_values)
         self.cache[key] = res
         return res
     def as_function(self, bvar_values, arity):
         def f(*args):
             assert len(args) == arity
-            args = tuple(reversed(args))
-            return self.evaluate(args + bvar_values)
+            return self.evaluate(bvar_values + list(args))
         return f
 
 class CalcBvar(CalcTerm):
-    def __init__(self, index):
-        self.index = index-1 # default debruijn indices are from 1, here from 0
-        assert self.index >= 0
-        super().__init__(1 << self.index)
+    def __init__(self, term):
+        self.index = term.debruijn_height # default debruijn indices are from 1, here from 0
+        assert self.index >= 1
+        super().__init__(term)
     def evaluate_raw(self, bvar_values):
-        return bvar_values[self.index]
+        return bvar_values[-self.index]
 
 class CalcStep(CalcTerm):
-    def __init__(self, f, signature, args):
-        used_bvars = 0
-        for numb, arg in zip(signature, args):
-            used_bvars |= (arg.used_bvars >> numb)
-        super().__init__(used_bvars)
+    def __init__(self, term, f, args):
+        super().__init__(term)
         self.f = f
-        self.signature = signature
+        self.signature = term.f.signature
         self.args = args
     def evaluate_raw(self, bvar_values):
         args = (
             arg.as_function(bvar_values, numb)
             for arg, numb in zip(self.args, self.signature)
         )
-        # for arg, numb in zip(self.args, self.signature):
-        #     if numb: args.append(arg.as_function(bvar_values, numb))
-        #     else: args.append(arg.evaluate(bvar_values))
         return self.f(*args)
 
 class Calculator(Verifier):
@@ -148,7 +137,7 @@ class Calculator(Verifier):
     def build_calc_term(self, term, cache):
         res = cache.get(term)
         if res is not None: return res
-        if isinstance(term, BVar): res = CalcBvar(term.debruijn_height)
+        if isinstance(term, BVar): res = CalcBvar(term)
         else:
             if isinstance(term.f, TermVariable):
                 raise Exception(f"Cannot calculate variable '{term.f}' (in '{term}')")
@@ -156,7 +145,7 @@ class Calculator(Verifier):
             if f_repr is None:
                 raise Exception(f"Calculator: constant '{term.f}' doesn't have an interpretation")
             args = [self.build_calc_term(arg, cache) for arg in term.args]
-            res = CalcStep(f_repr, term.f.signature, args)
+            res = CalcStep(term, f_repr, args)
         cache[term] = res
         return res
     
@@ -172,7 +161,7 @@ class Calculator(Verifier):
             if only_try: return None
             else: raise
         try:
-            val = calc_term.evaluate(())
+            val = calc_term.evaluate([])
         except AssertionError:
             if only_try: return None
             else: raise

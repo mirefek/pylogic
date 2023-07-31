@@ -1,5 +1,5 @@
 import curses
-from annotated_term import AnnotatedTerm
+from annotated_term import *
 from thibault import ThibaultEnv, SimpRewriter
 import itertools
 from calc_numbers import MathNumber
@@ -21,12 +21,12 @@ class ThibaultTui:
         )
         self.aterm.add_notation()
         self.aterm.link_bvars()
-        self.aterm.notation.auto_split_lines()
+        self.aterm.notation.auto_split_lines(60)
 
         # evaluate on first 20 elements
         self.aterm.add_calc_term(tenv.calculator)
         for n in range(20):
-            self.aterm.calc_term.evaluate((MathNumber(n),))
+            self.aterm.calc_term.evaluate([MathNumber(n)])
 
         # prepare TUI
         self.scr = stdscr
@@ -67,12 +67,12 @@ class ThibaultTui:
             if i == 0 and aterm.term.is_free_var:
                 if hl_indent is None: attr = self.fvar_color_pair
                 else: attr = self.hl_fvar_color_pair
-            elif isinstance(part, tuple): # binder
+            elif isinstance(part, ATNBinder):
                 if hl_indent is not None: attr = self.hl_bvar_color_pair
-                elif part[0] in self.hl_path:
+                elif aterm.subterms[part.ai] in self.hl_path:
                     attr = self.fvar_color_pair
                 else: attr = self.bvar_color_pair
-            elif isinstance(part, int): # bound variable
+            elif isinstance(part, ATNBvar):
                 if aterm.bvar_link is None or aterm.bvar_link in self.hl_path:
                     if hl_indent is None: attr = self.fvar_color_pair
                     else: attr = self.hl_fvar_color_pair
@@ -89,10 +89,10 @@ class ThibaultTui:
                         self.scr.addstr(spaces[hl_indent:], attr)
                     else:
                         self.scr.addstr(spaces, attr)
-            if isinstance(part, AnnotatedTerm):
-                self.display_aterm(part, hl_indent = hl_indent)
+            if isinstance(part, ATNSubterm):
+                self.display_aterm(aterm.subterms[part.ai], hl_indent = hl_indent)
             else:
-                self.scr.addstr(atn.part_to_str(part), attr)
+                self.scr.addstr(str(part), attr)
 
     def display_calc_cache(self, aterm):
         cache = aterm.calc_term.cache
@@ -101,19 +101,14 @@ class ThibaultTui:
         start_y = cur_y+2
 
         # collect header
-        bvs = [name for name in aterm.bound_names]
-        n = len(bvs)
-        used_vars = [
-            name for i,name in enumerate(bvs)
-            if aterm.calc_term.used_bvars & (1 << (n-i-1))
-        ]
+        used_vars = [aterm.bound_names[-i] for i in aterm.calc_term.used_bvars]
 
         # collect data
         num_rows = min(len(cache), max_y - start_y-1)
         if not num_rows: return
 
         rows = [
-            [str(x) for x in reversed(args)]+[str(value)]
+            [str(x) for x in args]+[str(value)]
             for args, value in itertools.islice(cache.items(), num_rows)
         ]
         cols = list(zip(*rows))
@@ -141,7 +136,7 @@ class ThibaultTui:
 
         for i, row in enumerate(rows):
             if i == 0:
-                attrs = [self.fvar_color_pair]*n + [0]
+                attrs = [self.fvar_color_pair]*len(used_vars) + [0]
             else: attrs = [0]*len(row)
             self.scr.move(start_y+i, 0)
             for j,(x,attr) in enumerate(zip(row, attrs)):
@@ -200,9 +195,16 @@ class ThibaultTui:
 
     def irewrite(self):
         scr_height, scr_width = self.scr.getmaxyx()
+        def show_err(err):
+            scr_height, scr_width = self.scr.getmaxyx()
+            self.scr.move(scr_height-4-err.count('\n'), 0)
+            self.scr.addstr('\n')
+            self.scr.addstr(err+'\n')
+            self.scr.addstr('\n')
 
         line_edit = LineEdit(self.scr)
         while True:
+            line_edit._set_cursor()
             res = line_edit.loop()
             if res is None or res.strip() == '': break
             try:
@@ -211,11 +213,53 @@ class ThibaultTui:
                     local_context = self.hl_subterm.bound_names,
                     available_vars = ()
                 )
+                if not (term.bound_vars <= self.hl_subterm.term.bound_vars):
+                    extra_bvars = sorted(term.bound_vars - self.hl_subterm.term.bound_vars)
+                    extra_bvars = [self.hl_subterm.bound_names[-x] for x in extra_bvars]
+                    extra_bvars.reverse()
+                    extra_bvars = ' '.join(extra_bvars)
+                    show_err(f"Extra bound variables not supported (yet):\n  {extra_bvars}")
+                    continue
+
+                aterm = AnnotatedTerm(term, bound_names = self.hl_subterm.bound_names)
+                aterm.add_calc_term(tenv.calculator)
+
+                failed = False
+                args = [None]*len(self.hl_subterm.bound_names)
+                cterm0 = self.hl_subterm.calc_term
+                cterm1 = aterm.calc_term
+                for key, value0 in cterm0.cache.items():
+                    for i,x in zip(cterm0.used_bvars, key):
+                        args[-i] = x
+                    value1 = cterm1.evaluate(args)
+                    if value0 != value1:
+                        input_vars = ' '.join(str(x) for x in key)
+                        show_err(f"Inconsistent value\n  {input_vars}\n  ori = {value0}, new = {value1}")
+                        failed = True
+                        break
+                if failed: continue
+
+                # exchange in the term
+                aterm.new_bound_names = self.hl_subterm.new_bound_names
+                if self.hl_subterm == self.aterm: self.aterm = aterm
+                else: self.hl_subterm.parent.replace_subterm(self.hl_subterm.parent_i, aterm)
+
+                self.hl_path.remove(self.hl_subterm)
+                self.hl_subterm = aterm
+                self.hl_path.add(self.hl_subterm)
+                aterm.add_notation()
+                for x in aterm.path_to_root(): x.notation.calculate_str()
+                aterm.link_bvars()
+                self.aterm.notation.auto_split_lines(60)
+                self.down_ids = []
                 break
             except Exception as e:
-                self.scr.addstr(scr_height-5,0,str(e))
                 if isinstance(e, ErrorInLine):
+                    show_err(str(e.msg))
                     line_edit.cursor = e.start
+                else:
+                    raise
+                    show_err(str(e))
 
 if __name__ == "__main__":
     import os
@@ -230,6 +274,11 @@ if __name__ == "__main__":
         term = rewriter.run(term, simp_rewriter, repeat = True).term[1]
         term = rewriter.run(term, tenv.env.constants.let).term[1]
         term = rewriter.run(term, simp_rewriter, repeat = True).term[1]
+        return term
+
+    def make_term_kolakoski():
+        line = "C C L C G C C D H B E A K C H A K N L C G M C C D H B E A K C H A K N L C G M C C D H B E A K C H A K N L C G M C C D H B E A K C H A K N L C G M C C D H B E A K C H A K N L C G M C C D H B E A K C H A K N L C G M C C D H B E A K C H A K N K M E C G C H E"
+        term = tenv.letters_to_seq_program(line.split())
         return term
 
     def make_term2():

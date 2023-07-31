@@ -4,18 +4,21 @@ from calculator import Calculator, CalcTerm
 class ATNotation:
     def __init__(self, aterm):
         self.aterm = aterm
-        self.term = aterm.term
         self.parts = []
         self.spaces = []
         self.arg_i_to_part_i = []
 
         if isinstance(self.term, BVar):
-            self.parts.append(self.term.debruijn_height)
+            self.parts.append(ATNBvar(self.aterm, self.term.debruijn_height))
             return
 
         if self.term.f.notation is not None:
             self.build_operator_syntax()
         else: self.build_function_syntax()
+
+    @property
+    def term(self):
+        return self.aterm.term
 
     def build_function_syntax(self):
         self.parts.append(self.term.f.name)
@@ -56,13 +59,13 @@ class ATNotation:
         n = len(subaterm.new_bound_names)
 
         for i in range(n):
-            self.parts.append((subaterm, i))
+            self.parts.append(ATNBinder(self.aterm, subaterm.parent_i, i))
             self.spaces.append(' ')
             self.parts.append(':')
             self.spaces.append(' ')
 
         self.arg_i_to_part_i.append(len(self.parts))
-        self.parts.append(subaterm)
+        self.parts.append(ATNSubterm(self.aterm, subaterm.parent_i))
 
     def check_bracket_necesity(self):
         rule = self.term.f.notation
@@ -83,21 +86,11 @@ class ATNotation:
 
         return False
 
-    def part_to_str(self, part):
-        if isinstance(part, str): return part
-        elif isinstance(part, int):
-            return self.aterm.bound_names[-part]
-        elif isinstance(part, tuple):
-            subaterm,vi = part
-            return subaterm.new_bound_names[vi]
-        elif isinstance(part, AnnotatedTerm):
-            return part.notation.str_cache
-
     def calculate_str(self):
         n = len(self.parts)
         assert len(self.spaces) == n-1, (self.parts, self.spaces)
         substrs = [None]*(len(self.parts)*2-1)
-        substrs[::2] = [self.part_to_str(part) for part in self.parts]
+        substrs[::2] = [str(part) for part in self.parts]
         substrs[1::2] = self.spaces
         self.str_cache = ''.join(substrs)
 
@@ -117,7 +110,7 @@ class ATNotation:
             else: # otherwise after
                 if i < len(breakable): breakable[i] = False
 
-        parts = [self.part_to_str(part) for part in self.parts]
+        parts = [str(part) for part in self.parts]
         breakable_parts = [[parts[0]]]
         breakable_spaces = []
         space_ids = []
@@ -136,11 +129,33 @@ class ATNotation:
             else: after_size = len(after)
             after_size += len(space)
             if '\n' in before or n + after_size > line_width:
-                if isinstance(self.parts[idx+1], AnnotatedTerm): n = next_indent
+                if isinstance(self.parts[idx+1], ATNSubterm): n = next_indent
                 else: n = indent
                 self.spaces[idx] = '\n'+' '*n
             n += after_size
         self.calculate_str()
+
+class ATNPart:
+    pass
+class ATNBvar(ATNPart):
+    def __init__(self, aterm, index):
+        self.aterm = aterm
+        self.index = index
+    def __str__(self):
+        return self.aterm.bound_names[-self.index]
+class ATNBinder(ATNPart):
+    def __init__(self, aterm, ai,vi):
+        self.aterm = aterm
+        self.ai = ai
+        self.vi = vi
+    def __str__(self):
+        return self.aterm.subterms[self.ai].new_bound_names[self.vi]
+class ATNSubterm(ATNPart):
+    def __init__(self, aterm, ai):
+        self.aterm = aterm
+        self.ai = ai
+    def __str__(self):
+        return self.aterm.subterms[self.ai].notation.str_cache
 
 class FakeCache: # to avoid any sharing in calculation tree
     def get(self, key): return None
@@ -176,6 +191,25 @@ class AnnotatedTerm:
             ]
         else:
             self.subterms = []
+
+    def replace_subterm(self, i, subterm):
+        self.subterms[i] = subterm
+        if hasattr(self, 'calc_term'):
+            self.calc_term.args[i] = subterm.calc_term
+        subterm.parent = self
+        subterm.parent_i = i
+
+        aterm = self
+        while aterm is not None:
+            args = tuple(x.term for x in aterm.subterms)
+            aterm.term = TermApp(aterm.term.f, args, aterm.term.bound_names)
+            aterm = aterm.parent
+        
+    def path_to_root(self):
+        x = self.parent
+        while x is not None:
+            yield x
+            x = x.parent
 
     def add_notation(self):
         self.notation = ATNotation(self)
@@ -227,8 +261,16 @@ if __name__ == "__main__":
     from logic_env import LogicEnv
 
     env = LogicEnv()
+    env.parser.parse_file("axioms_thibault")
     # term = env.parser.parse_str("if C1; a else if C2; b else c")
     term = env.parser.parse_str("sum(1 .. X, b : if b % 4 = 0 || (b % 4 = 3 && ! ((1 + X) % b = 0)) ; 1 else if b % 4 = 3 || (b % 4 = 1 && (1 + X) % b = 0) ; 0 else - 1) + 1")
+    term = env.parser.parse_str("""
+    loop(X, 1, x : y :
+loop(y, prod(1 .. X - y, z : z + y), a : b :
+      3 * a * b // (2 + b) + a)
+    // factorial(X - y)
+  - x)
+""")
     aterm = AnnotatedTerm(term)
     print(term)
     aterm.add_notation()

@@ -6,8 +6,8 @@ class Token:
         self.t = t
 
 class ErrorInLine(Exception):
-    def __init__(self, exc, line_or_token, start = None, end = None, lineno = None):
-        self.exc = exc
+    def __init__(self, msg, line_or_token, start = None, end = None, lineno = None):
+        self.msg = msg
         if isinstance(line_or_token, Token):
             token = line_or_token
             self.line = token.line
@@ -32,7 +32,7 @@ class ErrorInLine(Exception):
         return line+'\n'+' '*start+'^'*self.l
 
     def __str__(self):
-        return str(self.exc) + '\n' + self.line_str()
+        return str(self.msg) + '\n' + self.line_str()
     
 class Lexer:
     def __init__(self):

@@ -355,7 +355,7 @@ class ParserState:
 
     def finish(self):
         rule, objects = self.stack.pop()
-        assert rule.can_pack(objects)
+        assert rule.can_pack(objects), "rule is not finished"
         res = SyntaxTree(rule, objects)
         while self.stack:
             rule, objects = self.stack.pop()
