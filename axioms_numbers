@@ -149,6 +149,8 @@ Definition binom(n,k) := require n in nats; require k in ints;
 Definition catalan(n) := binom(2*n, n) / (n+1)
 Definition _power(x,n) := require n in nats; prod(1..n, _:x)
 
+Definition primes := set(x : x in nats && x >= 2 && forall(d : d in 2..x-1 => x % d != 0))
+
 Notation _power   _ ^ _   INSIDE *
 
 Definition _is_increasing(f) :=

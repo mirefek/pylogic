@@ -1,8 +1,53 @@
 from fractions import Fraction
-from calc_set_fun import MathSet, MathFun, MathNumber
+from calc_set_fun import FiniteSet, InfiniteSet, MathSet, MathFun, MathNumber
 from term import TermApp
 
+class SetOfNats(InfiniteSet):
+    def __init__(self):
+        super().__init__("nats")
+    def contains(self, x):
+        return isinstance(x, MathNumber) and x.x % 1 == 0 and x.x >= 0
+class SetOfInts(InfiniteSet):
+    def __init__(self):
+        super().__init__("nats")
+    def contains(self, x):
+        return isinstance(x, MathNumber) and x.x % 1 == 0
+class SetOfFracs(InfiniteSet):
+    def __init__(self):
+        super().__init__("fracs")
+    def contains(self, x):
+        return isinstance(x, MathNumber)
+class SetOfReals(InfiniteSet):
+    def __init__(self):
+        super().__init__("reals")
+    def contains(self, x):
+        return isinstance(x, MathNumber)
+
+class SetOfPrimes(InfiniteSet):
+    def __init__(self):
+        super().__init__("primes")
+    def contains(self, x):
+        if not isinstance(x, MathNumber): return False
+        if x.x % 1 != 0: return False
+        x = int(x.x)
+        if x <= 1: return False
+        if x > 2 and x % 2 == 0: return False
+        if x > 3 and x % 3 == 0: return False
+        d = 5
+        while d**2 <= x:
+            if x % d == 0: return False
+            d += 2
+            if x % d == 0: return False
+            d += 4
+        return True
+
 class CalculationNumbers:
+    def calc_nats(self): return SetOfNats()
+    def calc_ints(self): return SetOfInts()
+    def calc_fracs(self): return SetOfFracs()
+    def calc_reals(self): return SetOfReals()
+    def calc_primes(self): return SetOfPrimes()
+
     def calc__plus(self, x: MathNumber, y : MathNumber):
         if not isinstance(x, MathNumber): return None
         if not isinstance(y, MathNumber): return None
@@ -46,16 +91,20 @@ class CalculationNumbers:
     def calc__int_range(self, x,y):
         if not isinstance(x, MathNumber) or x.x % 1: return None
         if not isinstance(y, MathNumber) or y.x % 1: return None
-        return MathSet(map(MathNumber, range(int(x.x), int(y.x)+1)))
+        return FiniteSet(map(MathNumber, range(int(x.x), int(y.x)+1)))
     def calc_maximum(self, A):
-        if not isinstance(A, MathSet): return None
+        if isinstance(A, InfiniteSet):
+            raise Exception("Don't know how to calculate maximum of an infinite set: A")
+        if not isinstance(A, FiniteSet): return None
         if any(
             not isinstance(x, MathNumber)
             for x in A.elements
         ): return None
         return max(A.elements, key = lambda x : x.x)
     def calc_minimum(self, A):
-        if not isinstance(A, MathSet): return None
+        if isinstance(A, InfiniteSet):
+            raise Exception("Don't know how to calculate minimum of an infinite set: A")
+        if not isinstance(A, FiniteSet): return None
         if any(
             not isinstance(x, MathNumber)
             for x in A.elements
@@ -82,7 +131,7 @@ class CalculationNumbers:
         return x.x % y.x == 0
 
     def calc_0_1_sum(self, A, body):
-        if not isinstance(A, MathSet): return None
+        if not isinstance(A, FiniteSet): return None
         res = 0
         for x in A.elements:
             y = body(x)
@@ -90,7 +139,7 @@ class CalculationNumbers:
             res += y.x
         return MathNumber(res)
     def calc_0_1_prod(self, A, body):
-        if not isinstance(A, MathSet): return None
+        if not isinstance(A, FiniteSet): return None
         res = 1
         for x in A.elements:
             y = body(x)
@@ -183,3 +232,4 @@ if __name__ == "__main__":
     print(calculator.calculate(tt("fun_on(0..5, n : fun_on(0..n, k:binom(n,k)))")))
     print(calculator.calculate(tt("forall_in(1..10, n : sum(0..n, k:binom(n,k)) = 2^n)")))
     print(calculator.calculate(tt("fun_on(0..10, n:catalan(n))")))
+    print(calculator.calculate(tt("primes & 1..100")))

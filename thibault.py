@@ -2,7 +2,7 @@ from term import Term, BVar, TermApp, TermFunction, TermVariable
 from parse_term import TermParser
 from logic_core import LogicCore, CoreTheorem
 from calculator import Calculator, LogicCalculation, CalcTerm
-from calc_set_fun import SetCalculation, FunCalculation, BinderCalculation, MathSet, MathFun, MathNumber
+from calc_set_fun import SetCalculation, FunCalculation, BinderCalculation, MathFun, MathNumber
 from calc_numbers import CalculationNumbers
 from calc_thibault import CalculationThibault
 from logic_env import LogicEnv, ConstantSet

@@ -18,7 +18,42 @@ class MathNumber:
             return str(int(self.x))
         else: return str(self.x)
 
-class MathSet(ContainerValue):
+class InfiniteSet: # abstract class
+    def __init__(self, name, is_sane = True):
+        self.name = name
+        self.is_sane = is_sane
+        if type(self) == InfiniteSet:
+            raise Exception("InfiniteSet can only be used as an abstract class")
+    def __contains__(self, x):
+        res = self.contains(x)
+        print(f"{x} -> {res}")
+        return is_sane(x) and self.contains(x)
+    def contains(self, x):
+        raise Exception("Not implemented")
+    def __eq__(self, other):
+        return type(other) == type(self)
+    def __hash__(self):
+        return hash(type(self))
+    def __str__(self):
+        return self.name
+
+def is_sane(x):
+    if x is None: return False
+    elif isinstance(x, InfiniteSet): return x.is_sane
+    else: return True
+
+class SetOfSets(InfiniteSet):
+    def __init__(self):
+        super().__init__("sets", False)
+    def contains(self, x):
+        return isinstance(x, MathSet)
+class Universe(InfiniteSet):
+    def __init__(self):
+        super().__init__("universe", False)
+    def contains(self, x):
+        return True
+
+class FiniteSet(ContainerValue):
     def __init__(self, elements):
         super().__init__()
         self.elements = frozenset(elements)
@@ -27,9 +62,11 @@ class MathSet(ContainerValue):
     def __hash__(self):
         return hash(self.elements)
     def __eq__(self, other):
-        return isinstance(other, MathSet) and self.elements == other.elements
+        return isinstance(other, FiniteSet) and self.elements == other.elements
     def __len__(self):
         return len(self.elements)
+    def __in__(self, x):
+        return x in self.elements
 
     def get_all_items(self):
         return self.elements
@@ -38,6 +75,8 @@ class MathSet(ContainerValue):
         item_names.sort()
         if not item_names: return '{}'
         return "{ " + ', '.join(item_names) + " }"        
+
+MathSet = (FiniteSet, InfiniteSet)
 
 class MathFun(ContainerValue):
     def __init__(self, key_value_pairs):
@@ -51,7 +90,7 @@ class MathFun(ContainerValue):
     def __hash__(self):
         return hash(self.identifier)
     def __eq__(self, other):
-        return isinstance(other, MathSet) and self.identifier == other.identifier
+        return isinstance(other, MathFun) and self.identifier == other.identifier
     def __len__(self):
         return len(self.mapping)
 
@@ -79,90 +118,143 @@ class MathFun(ContainerValue):
 
 class SetCalculation:
     def calc__is_Set(self, x): return isinstance(x, MathSet)
-    def calc__in(self, x, y): return isinstance(y, MathSet) and x in y.elements
-    def calc_bools(self): return MathSet([False, True])
+    def calc__in(self, x, y):
+        return isinstance(y, MathSet) and x in y
+    def calc_bools(self): return FiniteSet([False, True])
+    def calc_sets(self): return SetOfSets()
+    def calc_universe(self): return Universe()
+
     def calc__subset_eq(self, A, B):
         if not isinstance(A, MathSet): return False
         if not isinstance(B, MathSet): return False
-        return A.elements <= B.elements
+        if isinstance(A, FiniteSet):
+            if isinstance(B, FiniteSet):
+                return A.elements <= B.elements
+            else:
+                return all(x in B for x in A.elements)
+        else:
+            if isinstance(B, FiniteSet): return False
+            elif A == B: return True
+            else: raise Exception(f"Don't know how to compare infinite sets {A} <= {B}")
     def calc__supset_eq(self, A, B):
-        if not isinstance(A, MathSet): return False
-        if not isinstance(B, MathSet): return False
-        return A.elements >= B.elements
+        return self.calc__subset_eq(B, A)
     def calc__subset(self, A, B):
         if not isinstance(A, MathSet): return False
         if not isinstance(B, MathSet): return False
-        return A.elements < B.elements
+        if isinstance(A, FiniteSet):
+            if isinstance(B, FiniteSet):
+                return A.elements < B.elements
+            else:
+                return all(x in B for x in A.elements)
+        else:
+            if isinstance(B, FiniteSet): return False
+            elif A == B: return False
+            else: raise Exception(f"Don't know how to compare infinite sets: {A} < {B}")
     def calc__supset(self, A, B):
-        if not isinstance(A, MathSet): return False
-        if not isinstance(B, MathSet): return False
-        return A.elements > B.elements
+        return self.calc_subset(B, A)
+
     def calc__union(self, A, B):
         if not isinstance(A, MathSet): return None
         if not isinstance(B, MathSet): return None
-        return MathSet(A.elements | B.elements)
+        if isinstance(A, FiniteSet) and isinstance(B, FiniteSet):
+            return FiniteSet(A.elements | B.elements)
+        elif A == B: return A
+        else: raise Exception(f"Don't know how to union infinite sets: {A} | {B}")
     def calc__intersect(self, A, B):
         if not isinstance(A, MathSet): return None
         if not isinstance(B, MathSet): return None
-        return MathSet(A.elements & B.elements)
+        if isinstance(A, FiniteSet) and isinstance(B, FiniteSet):
+            return FiniteSet(A.elements & B.elements)
+        if isinstance(B, FiniteSet): A,B = B,A
+        if isinstance(A, InfiniteSet):
+            if A == B: return A
+            else: raise Exception(f"Don't know how to intersect infinite sets: {A} & {B}")
+        else:
+            return FiniteSet(x for x in A.elements if x in B)
     def calc__setdiff(self, A, B):
         if not isinstance(A, MathSet): return None
         if not isinstance(B, MathSet): return None
-        return MathSet(A.elements - B.elements)
+        if isinstance(A, FiniteSet) and isinstance(B, FiniteSet):
+            return FiniteSet(A.elements - B.elements)
+        if isinstance(A, InfiniteSet):
+            if A == B: return FiniteSet(())
+            else: raise Exception(f"Don't know how to subtract infintie sets: {A} - {B}")
+        else:
+            return FiniteSet(x for x in A.elements if x not in B)
+
     def calc_Union(self, A):
         if not isinstance(A, MathSet): return None
+        if isinstance(A, InfiniteSet):
+            raise Exception(f"Don't know how to calculate Union of an infinite set: {A}")
         res = set()
         for x in A.elements:
-            if isinstance(x, MathSet):
+            if isinstance(x, FiniteSet):
                 res.update(x.elements)
-        return MathSet(res)
+            elif isinstance(x, InfiniteSet):
+                raise Exception("Don't know how to calculate Union with infinite sets: A")
+        return FiniteSet(res)
     def calc_Intersect(self, A):
         if not isinstance(A, MathSet): return None
-        assert len(A.elements) > 0, "cannot calculate the universe"
-        res = None
+        if isinstance(A, InfiniteSet):
+            raise Exception(f"Don't know how to calculate Intersect of an infinite set: {A}")
+        if not A.elements: return Universe()
+        if all(isinstance(x, InfiniteSet) for x in A.elements):
+            raise Exception(f"Don't know how to calculate Intersect with only infinite sets: {A}")
+        if any(not isinstance(x, MathSet) for x in A.elements): return FiniteSet(())
+        res = set(next(x for x in A.elements if isinstance(x, FiniteSet)).elements)
         for x in A.elements:
-            if not isinstance(x, MathSet): res = set()
-            elif res is None: res = set(x.elements)
-            else: res &= x.elements
-        return MathSet(res)
+            if res is x: continue
+            elif isinstance(x, FiniteSet): res &= x.elements
+            else: res = set(el for el in res if el in x)
+        return FiniteSet(res)
+
     def calc_powerset(self, A):
-        if not isinstance(A, MathSet): return None
+        if isinstance(A, InfiniteSet):
+            raise Exception(f"Cannot calculate powerset of an infinite set: {A}")
+        if not isinstance(A, FiniteSet): return None
         elements = list(A.elements)
         res = []
         for mask in itertools.product(*[[False,True]]*len(elements)):
-            res.append(MathSet([el for el,taken in zip(elements, mask) if taken]))
-        return MathSet(res)
+            res.append(FiniteSet([el for el,taken in zip(elements, mask) if taken]))
+        return FiniteSet(res)
     def calc_unique_el(self, A):
-        if not isinstance(A, MathSet): return None
+        if not isinstance(A, FiniteSet): return None
         if len(A.elements) != 1: return None
         return next(iter(A.elements))
     def calc_set_singleton(self, x):
-        if x is None: return None
-        return MathSet([x])
+        if not is_sane(x): return None
+        return FiniteSet([x])
     def calc_set_pair(self, x,y):
-        if x is None: return None
-        if y is None: return None
-        return MathSet([x,y])
+        if not is_sane(x): return None
+        if not is_sane(y): return None
+        return FiniteSet([x,y])
     def calc__empty_set(self):
-        return MathSet([])
-    
+        return FiniteSet([])
+    def calc__is_sane(self, x): return is_sane(x)
+
 class FunCalculation:
     def calc__is_Fun(self, x):
         return isinstance(x, MathFun)
     def calc__apply(self, f, x):
         if not isinstance(f, MathFun): return None
         return f.mapping.get(x, None)
-    def calc_req_sane(self, x): return x
+    def calc_req_sane(self, x):
+        if is_sane(x): return x
+        else: return x
     def calc_domain(self, f):
         if not isinstance(f, MathFun): return None
-        return MathSet(f.mapping.keys())
+        return FiniteSet(f.mapping.keys())
     def calc_image(self, f):
         if not isinstance(f, MathFun): return None
-        return MathSet(f.mapping.values())
+        return FiniteSet(f.mapping.values())
     def calc_map_set(self, f,A):
         if not isinstance(f, MathFun): return None
-        if not isinstance(A, MathSet): return None
-        return MathSet([f.mapping.get(x, None) for x in A.elements])
+        if not isinstance(A, FiniteSet): return None
+        if isinstance(A, FiniteSet):
+            return FiniteSet([f.mapping.get(x, None) for x in A.elements])
+        elif isinstance(A, InfiniteSet):
+            return FiniteSet(y for x,y in f.mapping.items() if x in A)
+        else: return None
     def calc_empty_fun(self):
         return MathFun([])
     def calc_fun_pair(self, x,y):
@@ -189,16 +281,24 @@ class BinderCalculation:
     def calc_0_1_let(self, x, body):
         return body(x)
     def calc_1_0_map_set(self, f_body, A):
-        if not isinstance(A, MathSet): return None
-        return MathSet([f_body(x) for x in A.elements])
+        if isinstance(A, InfiniteSet):
+            raise Exception(f"Don't know how to map over an infinite set: {A}")
+        if not isinstance(A, FiniteSet): return None
+        return FiniteSet([f_body(x) for x in A.elements])
     def calc_0_1_exists_in(self, A, pred):
-        if not isinstance(A, MathSet): return False
+        if isinstance(A, InfiniteSet):
+            raise Exception(f"Don't know how to check existence in an infinite set: {A}")
+        if not isinstance(A, FiniteSet): return False
         return any(pred(x) for x in A.elements)
     def calc_0_1_forall_in(self, A, pred):
-        if not isinstance(A, MathSet): return False
+        if isinstance(A, InfiniteSet):
+            raise Exception(f"Don't know how to verify property in an infinite set: {A}")
+        if not isinstance(A, FiniteSet): return False
         return all(pred(x) for x in A.elements)
     def calc_0_1_exists_uq_in(self, A, pred):
-        if not isinstance(A, MathSet): return False
+        if isinstance(A, InfiniteSet):
+            raise Exception(f"Don't know how to check unique existence in an infinite set: {A}")
+        if not isinstance(A, FiniteSet): return False
         count = 0
         for x in A.elements:
             if pred(x):
@@ -206,7 +306,9 @@ class BinderCalculation:
                 if count > 1: return False
         return count == 1
     def calc_0_1_unique_in(self, A, pred):
-        if not isinstance(A, MathSet): return None
+        if isinstance(A, InfiniteSet):
+            raise Exception(f"Don't know how to find the unique solution in an infinite set: {A}")
+        if not isinstance(A, FiniteSet): return None
         res = None
         for x in A.elements:
             if pred(x):
@@ -214,7 +316,9 @@ class BinderCalculation:
                 else: res = x
         return res
     def calc_0_1_take_in(self, A, body):
-        if not isinstance(self, A, MathSet): return None
+        if isinstance(A, InfiniteSet):
+            raise Exception(f"Don't know how to call 'take' on an infinite set: {A}")
+        if not isinstance(self, A, FiniteSet): return None
         res = None
         for x in A.elements:
             y = body(x)
@@ -222,10 +326,14 @@ class BinderCalculation:
             if res is not None: return None
             res = y
     def calc_0_1_select_subset(self, A, pred):
-        if not isinstance(A, MathSet): return None
-        return MathSet([x for x in A.elements if pred(x)])
+        if isinstance(A, InfiniteSet):
+            raise Exception(f"Don't know how to select a subset of an infinite set: {A}")
+        if not isinstance(A, FiniteSet): return None
+        return FiniteSet([x for x in A.elements if pred(x)])
     def calc_0_1_fun_on(self, A, body):
-        if not isinstance(A, MathSet): return None
+        if isinstance(A, InfiniteSet):
+            raise Exception(f"Don't know how to build a function on an infinite set: {A}")
+        if not isinstance(A, FiniteSet): return None
         return MathFun([(x,body(x)) for x in A.elements])
 
 if __name__ == "__main__":
@@ -258,3 +366,5 @@ let(
   fun_on(image(f), y : unique_in(domain(f), x : f[x] = y))
 )
 """)))
+    print(calculator.calculate(tt("bools in sets")))
+    print(calculator.calculate(tt("sets in sets")))

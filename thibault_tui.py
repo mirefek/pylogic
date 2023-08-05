@@ -8,7 +8,7 @@ from line_edit import LineEdit
 from lexer import ErrorInLine
 
 class ThibaultTui:
-    def __init__(self, stdscr, tenv, term):
+    def __init__(self, stdscr, tenv, term, num_eval = 20):
 
         curses.start_color()
         curses.use_default_colors()
@@ -23,9 +23,9 @@ class ThibaultTui:
         self.aterm.link_bvars()
         self.aterm.notation.auto_split_lines(60)
 
-        # evaluate on first 20 elements
+        # evaluate on first num_eval elements
         self.aterm.add_calc_term(tenv.calculator)
-        for n in range(20):
+        for n in range(num_eval):
             self.aterm.calc_term.evaluate([MathNumber(n)])
 
         # prepare TUI
@@ -296,4 +296,18 @@ if __name__ == "__main__":
         )
         """)
 
-    curses.wrapper(ThibaultTui, tenv, make_term_motzkin())
+    def make_term_imerps():
+        code = """
+        compr(X, a :
+          if 1192 <= a % 1280 && a % 1280 <= 1271 ;
+            1 - loop(a // 4, a, b : c :
+                if b % (1 + c) <= 0 ; 0 else b)
+          else 1)
+        """
+        line = "B K C C C L D F D G D C K J K K F C C J H B K B L D H A K I K C G C G K J E B I K M"
+        term = tenv.letters_to_seq_program(line.split())
+        simp_rewriter = SimpRewriter(tenv)
+        term = tenv.env.rewriter.run(term, simp_rewriter, repeat = True).term[1]
+        return term        
+    
+    curses.wrapper(ThibaultTui, tenv, make_term_imerps(), 10)

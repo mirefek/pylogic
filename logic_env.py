@@ -27,7 +27,6 @@ class LogicEnv:
         self.parser.parse_file("axioms_fun")
         self.parser.parse_file("axioms_numbers")
 
-        self.calculator.accept_types(MathSet, MathFun, MathNumber)
         self.calculator.add_functions(
             self.parser.name_signature_to_const,
             LogicCalculation(),

@@ -228,7 +228,6 @@ class LogicCalculation:
         else: return b()
     def calc__is_bool(self, x): return isinstance(x, bool)
     # insane objects except null are not expected to be representable
-    def calc__is_sane(self, x): return x is not None
 
 if __name__ == "__main__":
     from parse_term import TermParser
