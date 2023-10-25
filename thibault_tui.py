@@ -237,13 +237,14 @@ class ThibaultTui:
         self.subterm_subterms = set()
         self.subterm_subterms.add(self.hl_subterm)
         self.update_abstract_term()
-    def cancel_subterm_mode(self, init = False):
+    def cancel_subterm_mode(self, init = False, update_path = True):
         if not init:
             if not self.subterm_mode: return
-            x = self.hl_subterm
-            while x not in self.hl_path:
-                self.hl_path.add(x)
-                x = x.parent
+            if update_path:
+                x = self.hl_subterm
+                while x not in self.hl_path:
+                    self.hl_path.add(x)
+                    x = x.parent
         self.subterm_mode = False
         self.unfade = None
         self.subterm_subterms = None
@@ -290,8 +291,8 @@ class ThibaultTui:
 
                 self.hl_path.remove(aterm_ori)
                 self.hl_subterm = replaced
-                self.cancel_subterm_mode()
                 self.hl_path.add(self.hl_subterm)
+                self.cancel_subterm_mode(update_path = False)
                 self.aterm.notation.auto_split_lines(self.pp_width)
                 self.down_ids = []
                 break
@@ -312,6 +313,7 @@ class ThibaultTui:
                             fv_values.append((v.name, val))
                         e.inputs = fv_values + e.inputs
                     show_err(str(e))
+                    # raise
 
 if __name__ == "__main__":
     import os
