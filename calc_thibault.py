@@ -36,6 +36,16 @@ class CalculationThibault:
             if not isinstance(val, MathNumber) or val.x % 1: return None
             if val.x <= 0: i -= 1
         return MathNumber(m)
+    def calc_0_1_comprb(self, a, f):
+        if not isinstance(a, MathNumber) or a.x % 1: return None
+        if a.x < 0: return None
+        i = a.x
+        m = -1
+        while i >= 0:
+            m += 1
+            val = f(MathNumber(m))
+            if val: i -= 1
+        return MathNumber(m)
 
     def calc_tri_pack(self,x,y):
         if not isinstance(x, MathNumber) or x.x % 1 or x.x < 0: return None

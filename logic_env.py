@@ -12,6 +12,7 @@ from term import BVar, TermApp
 from calculator import Calculator, LogicCalculation
 from calc_set_fun import SetCalculation, FunCalculation, BinderCalculation, MathSet, MathFun, MathNumber
 from calc_numbers import CalculationNumbers, math_number_expansion
+import os 
 
 class LogicEnv:
     def __init__(self, record_proof = False):
@@ -22,10 +23,11 @@ class LogicEnv:
             self.core,
             int_to_term = lambda n: self.calculator.get_value_term(MathNumber(n))
         )
-        self.parser.parse_file("axioms_logic")
-        self.parser.parse_file("axioms_set")
-        self.parser.parse_file("axioms_fun")
-        self.parser.parse_file("axioms_numbers")
+        dir_path = os.path.dirname(os.path.realpath(__file__))
+        self.parser.parse_file(os.path.join(dir_path, "axioms_logic"))
+        self.parser.parse_file(os.path.join(dir_path, "axioms_set"))
+        self.parser.parse_file(os.path.join(dir_path, "axioms_fun"))
+        self.parser.parse_file(os.path.join(dir_path, "axioms_numbers"))
 
         self.calculator.add_functions(
             self.parser.name_signature_to_const,

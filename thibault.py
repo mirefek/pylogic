@@ -74,7 +74,7 @@ class ThibaultEnv:
                 bound_names = bound_names,
             ),
         }
-        self.X = self.parser.get_var('X', 0)
+        self.X = self.parser.get_var('x', 0)
 
     def add_rewriter_extensionality(self):
         rewriter = self.env.rewriter
@@ -109,7 +109,7 @@ class ThibaultEnv:
         return res.substitute_bvars([self.X.to_term(), self.c_zero])
 
     def eval_closed(self, prog_term):
-        calc_term = self.env.calculator.build_calc_term(prog_term)
+        calc_term = self.env.calculator.build_calc_term(prog_term, cache = dict())
         res = calc_term.evaluate([])
         if not isinstance(res, MathNumber) or res.x % 1 != 0: return None
         return res.x
@@ -163,7 +163,7 @@ class SimplifyLet(RootRewriter):
                     if index is None: index = i
                     else: return False
             assert index is not None
-            bvar += term.f.signature[bvar]
+            bvar += term.f.signature[index]
             term = term[index]
         return True
 

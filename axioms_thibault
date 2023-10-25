@@ -25,6 +25,16 @@ Definition loop2(a,b,c, x:y:z:f(x,y,z),x:y:z:g(x,y,z)) :=
     u[a]
   )
 
+Definition comprb(a, x:f(x)) :=
+  require a in nats;
+  take(ms :
+    require domain(ms) = 0 .. a;
+    require image(ms) = 0 .. ms[a] & set(m : f(m));
+    require ms is_increasing;
+    require forall_in(0 .. ms[a], m : f(m) in ints);
+    ms[a]
+  )
+
 Definition compr(a, x:f(x)) :=
   require a in nats;
   take(ms :

@@ -30,20 +30,28 @@ class ContainerValue:
 
 class CalcTerm:
     def __init__(self, term):
+        self.cache0 = dict()
         self.cache = dict()
         self.used_bvars = sorted(term.bound_vars, reverse = True)
     def evaluate_raw(self, bvar_values):
         raise Exception("Not implemented")
     def evaluate(self, bvar_values):
-        key = tuple(bvar_values[-i] for i in self.used_bvars)
-        if key in self.cache: return self.cache[key]
-        res = self.evaluate_raw(bvar_values)
-        self.cache[key] = res
+        bvar_values = tuple(bvar_values)
+        if bvar_values in self.cache0:
+            res = self.cache0[bvar_values]
+        else:
+            key = tuple(bvar_values[-i] for i in self.used_bvars)
+            if key in self.cache:
+                res = self.cache[key]
+            else:
+                res = self.evaluate_raw(bvar_values)
+                self.cache[key] = res
+            self.cache0[bvar_values] = res
         return res
     def as_function(self, bvar_values, arity):
         def f(*args):
             assert len(args) == arity
-            return self.evaluate(bvar_values + list(args))
+            return self.evaluate(bvar_values + args)
         return f
 
 class CalcBvar(CalcTerm):

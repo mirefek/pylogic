@@ -1,4 +1,7 @@
+#!/usr/bin/python3
+
 import curses
+from term import next_names
 from annotated_term import *
 from thibault import ThibaultEnv, SimpRewriter
 import itertools
@@ -8,7 +11,7 @@ from line_edit import LineEdit
 from lexer import ErrorInLine
 
 class ThibaultTui:
-    def __init__(self, stdscr, tenv, term, num_eval = 20):
+    def __init__(self, stdscr, tenv, term, num_eval, right_space = 20):
 
         curses.start_color()
         curses.use_default_colors()
@@ -17,11 +20,13 @@ class ThibaultTui:
         self.tenv = tenv
         self.aterm = AnnotatedTerm(
             term.substitute_free({tenv.X : BVar(1)}),
-            bound_names = ['X']
+            bound_names = ['x']
         )
         self.aterm.add_notation()
         self.aterm.link_bvars()
-        self.aterm.notation.auto_split_lines(60)
+        win_height, win_width = stdscr.getmaxyx()
+        self.pp_width = win_width - right_space
+        self.aterm.notation.auto_split_lines(self.pp_width)
 
         # evaluate on first num_eval elements
         self.aterm.add_calc_term(tenv.calculator)
@@ -35,6 +40,8 @@ class ThibaultTui:
         self.hl_path = set((self.hl_subterm,))
         self.init_color_pairs()
         self.down_ids = []
+        self.subterm_mode = True
+        self.cancel_subterm_mode(init = True)
 
         self.loop()
 
@@ -57,28 +64,36 @@ class ThibaultTui:
         curses.init_pair(5, color_fvar, color_bg)
         self.hl_fvar_color_pair = curses.color_pair(5)
 
-    def display_aterm(self, aterm, hl_indent = None):
+        faded_color = 8
+        curses.init_pair(6, faded_color, curses.COLOR_BLACK)
+        self.faded_color_pair = curses.color_pair(6)
+
+    def display_aterm(self, aterm, hl_indent = None, faded = None):
+        if faded is None: faded = self.subterm_mode
         if aterm == self.hl_subterm:
             _, hl_indent = self.scr.getyx()
         atn = aterm.notation
+        if aterm == self.unfade: faded = False
         for i,part in enumerate(atn.parts):
-            if hl_indent is None: attr = 0
-            else: attr = self.hl_color_pair
-            if i == 0 and aterm.term.is_free_var:
-                if hl_indent is None: attr = self.fvar_color_pair
-                else: attr = self.hl_fvar_color_pair
-            elif isinstance(part, ATNBinder):
-                if hl_indent is not None: attr = self.hl_bvar_color_pair
-                elif aterm.subterms[part.ai] in self.hl_path:
-                    attr = self.fvar_color_pair
-                else: attr = self.bvar_color_pair
-            elif isinstance(part, ATNBvar):
-                if aterm.bvar_link is None or aterm.bvar_link in self.hl_path:
+            if faded: attr = self.faded_color_pair
+            else:
+                if hl_indent is None: attr = 0
+                else: attr = self.hl_color_pair
+                if i == 0 and aterm.term.is_free_var:
                     if hl_indent is None: attr = self.fvar_color_pair
                     else: attr = self.hl_fvar_color_pair
-                else:
-                    if hl_indent is None: attr = self.bvar_color_pair
-                    else: attr = self.hl_bvar_color_pair
+                elif isinstance(part, ATNBinder):
+                    if hl_indent is not None: attr = self.hl_bvar_color_pair
+                    elif aterm.subterms[part.ai] in self.hl_path:
+                        attr = self.fvar_color_pair
+                    else: attr = self.bvar_color_pair
+                elif isinstance(part, ATNBvar):
+                    if aterm.bvar_link is None or aterm.bvar_link in self.hl_path:
+                        if hl_indent is None: attr = self.fvar_color_pair
+                        else: attr = self.hl_fvar_color_pair
+                    else:
+                        if hl_indent is None: attr = self.bvar_color_pair
+                        else: attr = self.hl_bvar_color_pair
             if i > 0:
                 space_lines = atn.spaces[i-1].split('\n')
                 for si,spaces in enumerate(space_lines):
@@ -90,7 +105,7 @@ class ThibaultTui:
                     else:
                         self.scr.addstr(spaces, attr)
             if isinstance(part, ATNSubterm):
-                self.display_aterm(aterm.subterms[part.ai], hl_indent = hl_indent)
+                self.display_aterm(aterm.subterms[part.ai], faded = faded, hl_indent = hl_indent)
             else:
                 self.scr.addstr(str(part), attr)
 
@@ -143,12 +158,21 @@ class ThibaultTui:
                 self.scr.addstr('  ')
                 self.scr.addstr(x, attr)
 
+    def display_abstract_term(self):
+        cur_y,_ = self.scr.getyx()
+        start_y = cur_y+2
+        self.scr.move(start_y, 0)
+        self.scr.addstr(self.abstract_term.to_str(bound_names = tuple(self.unfade.bound_names)))
+
     def loop(self):
         self._running = True
         while self._running:
             self.scr.move(0, 0)
             self.display_aterm(self.aterm)
-            self.display_calc_cache(self.hl_subterm)
+            if not self.subterm_mode:
+                self.display_calc_cache(self.hl_subterm)
+            else:
+                self.display_abstract_term()
             key = self.scr.getkey()
             self.on_key(key)
             self.scr.clear()
@@ -158,6 +182,13 @@ class ThibaultTui:
         if key in ('q', '\x1b'):
             self._running = False
         elif key == 'KEY_DOWN':
+            if self.subterm_mode:
+                if self.hl_subterm in self.subterm_subterms:
+                    self.subterm_subterms.remove(self.hl_subterm)
+                    self.subterm_subterms.update(
+                        self.hl_subterm.subterms
+                    )
+                self.update_abstract_term()
             if self.hl_subterm.subterms:
                 if self.down_ids:
                     self.hl_subterm = self.hl_subterm.subterms[self.down_ids.pop()]
@@ -166,32 +197,64 @@ class ThibaultTui:
                         self.hl_subterm.subterms,
                         key = lambda aterm: len(str(aterm))
                     )
-                self.hl_path.add(self.hl_subterm)
+                if not self.subterm_mode:
+                    self.hl_path.add(self.hl_subterm)
         elif key == 'KEY_UP':
+            if self.hl_subterm == self.unfade: self.cancel_subterm_mode()
             if self.hl_subterm.parent is not None:
                 self.down_ids.append(self.hl_subterm.parent_i)
-                self.hl_path.remove(self.hl_subterm)
+                if not self.subterm_mode: self.hl_path.remove(self.hl_subterm)
                 self.hl_subterm = self.hl_subterm.parent
         elif key == 'KEY_LEFT':
+            if self.hl_subterm == self.unfade: self.cancel_subterm_mode()
             if self.hl_subterm.parent is not None:
                 i = self.hl_subterm.parent_i
                 parent = self.hl_subterm.parent
                 if i > 0:
                     self.down_ids = []
-                    self.hl_path.remove(self.hl_subterm)
+                    if not self.subterm_mode: self.hl_path.remove(self.hl_subterm)
                     self.hl_subterm = parent.subterms[i-1]
-                    self.hl_path.add(self.hl_subterm)
+                    if not self.subterm_mode: self.hl_path.add(self.hl_subterm)
         elif key == 'KEY_RIGHT':
             if self.hl_subterm.parent is not None:
+                if self.hl_subterm == self.unfade: self.cancel_subterm_mode()
                 i = self.hl_subterm.parent_i
                 parent = self.hl_subterm.parent
                 if i < len(parent.subterms)-1:
                     self.down_ids = []
-                    self.hl_path.remove(self.hl_subterm)
+                    if not self.subterm_mode: self.hl_path.remove(self.hl_subterm)
                     self.hl_subterm = parent.subterms[i+1]
-                    self.hl_path.add(self.hl_subterm)
+                    if not self.subterm_mode: self.hl_path.add(self.hl_subterm)
+        elif key == ' ':
+            if self.subterm_mode: self.cancel_subterm_mode()
+            else: self.start_subterm_mode()
         elif key == '\n':
             self.irewrite()
+
+    def start_subterm_mode(self):
+        self.subterm_mode = True
+        self.unfade = self.hl_subterm
+        self.subterm_subterms = set()
+        self.subterm_subterms.add(self.hl_subterm)
+        self.update_abstract_term()
+    def cancel_subterm_mode(self, init = False):
+        if not init:
+            if not self.subterm_mode: return
+            x = self.hl_subterm
+            while x not in self.hl_path:
+                self.hl_path.add(x)
+                x = x.parent
+        self.subterm_mode = False
+        self.unfade = None
+        self.subterm_subterms = None
+        self.abstract_term = None
+        self.abstract_term_subst = None
+    def update_abstract_term(self):
+        names = next_names('A')
+        def make_var(arity):
+            name = next(names)
+            return self.tenv.parser.get_var(name, arity)
+        self.abstract_term, self.abstract_term_subst = self.unfade.abstract_subterms(self.subterm_subterms, make_var)
 
     def irewrite(self):
         scr_height, scr_width = self.scr.getmaxyx()
@@ -208,49 +271,28 @@ class ThibaultTui:
             res = line_edit.loop()
             if res is None or res.strip() == '': break
             try:
+                if self.subterm_mode:
+                    aterm_ori = self.unfade
+                    available_vars = set(self.abstract_term_subst.keys())
+                else:
+                    aterm_ori = self.hl_subterm
+                    available_vars = ()
                 term = self.tenv.env.parser.parse_str(
                     res,
-                    local_context = self.hl_subterm.bound_names,
-                    available_vars = ()
+                    local_context = aterm_ori.bound_names,
+                    available_vars = available_vars,
                 )
-                if not (term.bound_vars <= self.hl_subterm.term.bound_vars):
-                    extra_bvars = sorted(term.bound_vars - self.hl_subterm.term.bound_vars)
-                    extra_bvars = [self.hl_subterm.bound_names[-x] for x in extra_bvars]
-                    extra_bvars.reverse()
-                    extra_bvars = ' '.join(extra_bvars)
-                    show_err(f"Extra bound variables not supported (yet):\n  {extra_bvars}")
-                    continue
+                if self.subterm_mode:
+                    term = term.substitute_free(self.abstract_term_subst)
+                replaced = aterm_ori.calc_replace(term)
+                if self.aterm == aterm_ori:
+                    self.aterm = replaced
 
-                aterm = AnnotatedTerm(term, bound_names = self.hl_subterm.bound_names)
-                aterm.add_calc_term(tenv.calculator)
-
-                failed = False
-                args = [None]*len(self.hl_subterm.bound_names)
-                cterm0 = self.hl_subterm.calc_term
-                cterm1 = aterm.calc_term
-                for key, value0 in cterm0.cache.items():
-                    for i,x in zip(cterm0.used_bvars, key):
-                        args[-i] = x
-                    value1 = cterm1.evaluate(args)
-                    if value0 != value1:
-                        input_vars = ' '.join(str(x) for x in key)
-                        show_err(f"Inconsistent value\n  {input_vars}\n  ori = {value0}, new = {value1}")
-                        failed = True
-                        break
-                if failed: continue
-
-                # exchange in the term
-                aterm.new_bound_names = self.hl_subterm.new_bound_names
-                if self.hl_subterm == self.aterm: self.aterm = aterm
-                else: self.hl_subterm.parent.replace_subterm(self.hl_subterm.parent_i, aterm)
-
-                self.hl_path.remove(self.hl_subterm)
-                self.hl_subterm = aterm
+                self.hl_path.remove(aterm_ori)
+                self.hl_subterm = replaced
+                self.cancel_subterm_mode()
                 self.hl_path.add(self.hl_subterm)
-                aterm.add_notation()
-                for x in aterm.path_to_root(): x.notation.calculate_str()
-                aterm.link_bvars()
-                self.aterm.notation.auto_split_lines(60)
+                self.aterm.notation.auto_split_lines(self.pp_width)
                 self.down_ids = []
                 break
             except Exception as e:
@@ -258,11 +300,22 @@ class ThibaultTui:
                     show_err(str(e.msg))
                     line_edit.cursor = e.start
                 else:
-                    raise
+                    if isinstance(e, InconsistentValueError) and self.subterm_mode:
+                        fv_values = []
+                        bvar_values = [None]*aterm_ori.term.debruijn_height
+                        for i,(name,value) in zip(aterm_ori.calc_term.used_bvars, e.inputs):
+                            bvar_values[-i] = value
+                        for v,val in self.abstract_term_subst.items():
+                            if v.arity > 0: continue
+                            cterm = self.tenv.calculator.build_calc_term(val, dict())
+                            val = cterm.evaluate(bvar_values)
+                            fv_values.append((v.name, val))
+                        e.inputs = fv_values + e.inputs
                     show_err(str(e))
 
 if __name__ == "__main__":
     import os
+    import argparse
     os.environ['TERM'] = 'xterm-256color'
 
     tenv = ThibaultEnv()
@@ -309,5 +362,33 @@ if __name__ == "__main__":
         simp_rewriter = SimpRewriter(tenv)
         term = tenv.env.rewriter.run(term, simp_rewriter, repeat = True).term[1]
         return term        
-    
-    curses.wrapper(ThibaultTui, tenv, make_term_imerps(), 10)
+
+    def make_term_A13108():
+        code = """
+        (- 1) ^ X * (prod(0 .. X - 1, z : 1 + (2 * z + 1) ^ 2)
+          + 2 * X * prod(0 .. X - 1, z : 1 + (2 * z) ^ 2))
+        """
+        line = "A K E K B L K L F L F K D C L D K C G B K C H N K L F A L K E B K N F A B B K L H D L N F K D D L K A K N K G B B K K D D J B E J"
+        term = tenv.letters_to_seq_program(line.split())
+        simp_rewriter = SimpRewriter(tenv)
+        term = tenv.env.rewriter.run(term, simp_rewriter, repeat = True).term[1]
+        return term
+
+    def take_program_from_stdin():
+        import sys
+        print("Input a program in the letters format")
+        line = sys.stdin.readline()
+        term = tenv.letters_to_seq_program(line.split())
+        simp_rewriter = SimpRewriter(tenv)
+        term = tenv.env.rewriter.run(term, simp_rewriter, repeat = True).term[1]
+        return term
+
+    cmd_parser = argparse.ArgumentParser(prog='thibault_tui.py',
+                                         description='examinor of generated OEIS programs',
+                                         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    cmd_parser.add_argument("--num_eval", type=int, default = "20", help="Number of points wher the program gets evaluated")
+    cmd_parser.add_argument("--test", action = "store_true", default = False, help="Uses prepared program instead of reading from stdin")
+    config = cmd_parser.parse_args()
+    if config.test: program = make_term_imerps()
+    else: program = take_program_from_stdin()
+    curses.wrapper(ThibaultTui, tenv, program, config.num_eval)

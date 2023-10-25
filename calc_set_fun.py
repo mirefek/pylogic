@@ -26,7 +26,7 @@ class InfiniteSet: # abstract class
             raise Exception("InfiniteSet can only be used as an abstract class")
     def __contains__(self, x):
         res = self.contains(x)
-        print(f"{x} -> {res}")
+        #print(f"{x} -> {res}")
         return is_sane(x) and self.contains(x)
     def contains(self, x):
         raise Exception("Not implemented")
