@@ -321,7 +321,7 @@ class Substitution:
                     if v <= term.f.arity:
                         arg = self.run(term.args[term.f.arity-v], depth)
                     else:
-                        arg = BVar(depth+v)
+                        arg = BVar(depth+v-term.f.arity)
                     args[v] = arg
                     if not isinstance(arg, BVar) or arg.debruijn_height != v:
                         changed = True
