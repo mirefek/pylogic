@@ -10,8 +10,8 @@ from goal_context import GoalEnv
 from tactics import Tactics
 from term import BVar, TermApp
 from calculator import Calculator, LogicCalculation
-from calc_set_fun import SetCalculation, FunCalculation, BinderCalculation, MathSet, MathFun, MathNumber
-from calc_numbers import CalculationNumbers, math_number_expansion
+from calc_set_fun import SetCalculation, FunCalculation, BinderCalculation, MathSet, FiniteSet, MathFun, MathNumber
+from calc_numbers import CalculationNumbers, math_number_expansion, interval_expansion
 import os 
 
 class LogicEnv:
@@ -40,6 +40,13 @@ class LogicEnv:
         self.calculator.set_term_expansion(
             MathNumber,
             math_number_expansion(
+                self.calculator,
+                self.parser.name_signature_to_const,
+            )
+        )
+        self.calculator.set_term_expansion(
+            FiniteSet,
+            interval_expansion(
                 self.calculator,
                 self.parser.name_signature_to_const,
             )

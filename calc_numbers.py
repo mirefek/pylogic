@@ -193,6 +193,21 @@ def math_number_expansion(calculator, name_signature_to_const):
         return res
     return expand_math_number
 
+def interval_expansion(calculator, name_signature_to_const):
+    int_range = name_signature_to_const['_int_range', (0,0)]
+    def expand_interval(value):
+        if not isinstance(value, FiniteSet): return None
+        if len(value) == 0: return None
+        if not all(isinstance(x, MathNumber) and x.x % 1 == 0 for x in value.elements):
+            return None
+        min_el = min(value.elements, key = lambda x: x.x)
+        max_el = max(value.elements, key = lambda x: x.x)
+        if len(value) != max_el.x - min_el.x+1: return None
+        min_el = calculator.get_value_term(min_el)
+        max_el = calculator.get_value_term(max_el)
+        return TermApp(int_range, (min_el,max_el))
+    return expand_interval
+
 if __name__ == "__main__":
     from parse_term import TermParser
     from logic_core import LogicCore
@@ -224,6 +239,13 @@ if __name__ == "__main__":
             parser.name_signature_to_const,
         )
     )
+    calculator.set_term_expansion(
+        FiniteSet,
+        interval_expansion(
+            calculator,
+            parser.name_signature_to_const,
+        )
+    )
     def tt(s):
         return parser.parse_str(s)
     print(calculator.calculate(tt("1/3 - 1/2")))
@@ -233,3 +255,4 @@ if __name__ == "__main__":
     print(calculator.calculate(tt("forall_in(1..10, n : sum(0..n, k:binom(n,k)) = 2^n)")))
     print(calculator.calculate(tt("fun_on(0..10, n:catalan(n))")))
     print(calculator.calculate(tt("primes & 1..100")))
+    print(calculator.calculate(tt("-100 .. 10 & -10 .. 100")))

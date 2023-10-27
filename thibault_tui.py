@@ -122,8 +122,11 @@ class ThibaultTui:
         num_rows = min(len(cache), max_y - start_y-1)
         if not num_rows: return
 
+        def value_to_str(value):
+            term = self.tenv.calculator.get_value_term(value)
+            return str(term)
         rows = [
-            [str(x) for x in args]+[str(value)]
+            [value_to_str(x) for x in args]+[value_to_str(value)]
             for args, value in itertools.islice(cache.items(), num_rows)
         ]
         cols = list(zip(*rows))
