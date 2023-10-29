@@ -305,6 +305,7 @@ class AnnotatedTerm:
         for args, value0 in cterm0.cache0.items():
             value1 = cterm1.evaluate(args)
             if value0 != value1:
+                key = tuple(args[-i] for i in cterm0.used_bvars)
                 raise InconsistentValueError(
                     input_names = [self.bound_names[-x] for x in cterm0.used_bvars],
                     input_vals = key,
