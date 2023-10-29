@@ -300,12 +300,9 @@ class AnnotatedTerm:
         aterm = AnnotatedTerm(term, bound_names = self.bound_names)
         aterm.add_calc_term(self.calculator)
 
-        args = [None]*len(self.bound_names)
         cterm0 = self.calc_term
         cterm1 = aterm.calc_term
-        for key, value0 in cterm0.cache.items():
-            for i,x in zip(cterm0.used_bvars, key):
-                args[-i] = x
+        for args, value0 in cterm0.cache0.items():
             value1 = cterm1.evaluate(args)
             if value0 != value1:
                 raise InconsistentValueError(
