@@ -11,39 +11,44 @@ from line_edit import LineEdit
 from lexer import ErrorInLine
 
 class ThibaultTui:
-    def __init__(self, stdscr, tenv, term, num_eval, right_space = 20):
+    def __init__(self, stdscr, fname, num_eval, right_space = 20):
+
+        start, prev_values = self.load_aterm(fname)
 
         curses.start_color()
         curses.use_default_colors()
 
         # prepare AnnotatedTerm
-        self.tenv = tenv
-        self.aterm = AnnotatedTerm(
-            term.substitute_free({tenv.X : BVar(1)}),
-            bound_names = ['x']
-        )
-        self.aterm.add_notation()
-        self.aterm.link_bvars()
         win_height, win_width = stdscr.getmaxyx()
         self.pp_width = win_width - right_space
         self.aterm.notation.auto_split_lines(self.pp_width)
 
-        # evaluate on first num_eval elements
-        self.aterm.add_calc_term(tenv.calculator)
-        for n in range(num_eval):
-            self.aterm.calc_term.evaluate([MathNumber(n)])
+        with open(fname, 'a') as self.f:
 
-        # prepare TUI
-        self.scr = stdscr
-        curses.curs_set(False)
-        self.hl_subterm = self.aterm
-        self.hl_path = set((self.hl_subterm,))
-        self.init_color_pairs()
-        self.down_ids = []
-        self.subterm_mode = True
-        self.cancel_subterm_mode(init = True)
+            # evaluate on first num_eval elements
+            self.aterm.add_calc_term(self.tenv.calculator)
+            seq = []
+            for n in range(num_eval):
+                seq.append(self.aterm.calc_term.evaluate([MathNumber(n)]))
+            assert all(isinstance(x, MathNumber) and x.x % 1 == 0 for x in seq)
+            seq = [int(x.x) for x in seq]
+            assert all(x == y for x,y in zip(prev_values, seq))
 
-        self.loop()
+            if len(seq) > len(prev_values):
+                self.log("VALUES", ' '.join(map(str, seq)))
+            if start: self.log_term()
+
+            # prepare TUI
+            self.scr = stdscr
+            curses.curs_set(False)
+            self.hl_subterm = self.aterm
+            self.hl_path = set((self.hl_subterm,))
+            self.init_color_pairs()
+            self.down_ids = []
+            self.subterm_mode = True
+            self.cancel_subterm_mode(init = True)
+
+            self.loop()
 
     def init_color_pairs(self):
         color_fvar = curses.COLOR_YELLOW
@@ -67,6 +72,33 @@ class ThibaultTui:
         faded_color = 8
         curses.init_pair(6, faded_color, curses.COLOR_BLACK)
         self.faded_color_pair = curses.color_pair(6)
+
+    def load_aterm(self, fname):
+        
+        with open(fname) as f:
+            term_str = None
+            values_str = ""
+            program = next(f)
+            for line in f:
+                if ': ' in line:
+                    tag, data = line.split(': ', 1)
+                    if tag == "TERM": term_str = data
+                    elif tag == "VALUES": values_str = data
+        self.tenv = ThibaultEnv()
+        if term_str is None:
+            term = self.tenv.letters_to_seq_program(program.split())
+            simp_rewriter = SimpRewriter(self.tenv)
+            term = self.tenv.env.rewriter.run(term, simp_rewriter, repeat = True).term[1]
+        else:
+            term = self.tenv.env.parser.parse_str(term_str)
+        term = term.substitute_free({self.tenv.X : BVar(1)})
+
+        self.aterm = AnnotatedTerm(term, bound_names = ['x'])
+        self.aterm.add_notation()
+        self.aterm.link_bvars()
+
+        values = [int(x) for x in values_str.split()]
+        return term_str is None, values
 
     def display_aterm(self, aterm, hl_indent = None, faded = None):
         if faded is None: faded = self.subterm_mode
@@ -276,9 +308,15 @@ class ThibaultTui:
             if res is None or res.strip() == '': break
             try:
                 if self.subterm_mode:
+                    lhs_str = self.abstract_term.to_str(
+                        bound_names = tuple(self.unfade.bound_names)
+                    )
                     aterm_ori = self.unfade
                     available_vars = set(self.abstract_term_subst.keys())
                 else:
+                    lhs_str = self.hl_subterm.term.to_str(
+                        bound_names = tuple(self.hl_subterm.bound_names)
+                    )
                     aterm_ori = self.hl_subterm
                     available_vars = ()
                 term = self.tenv.env.parser.parse_str(
@@ -286,6 +324,7 @@ class ThibaultTui:
                     local_context = aterm_ori.bound_names,
                     available_vars = available_vars,
                 )
+                rhs_str = term.to_str(bound_names = tuple(aterm_ori.bound_names))
                 if self.subterm_mode:
                     term = term.substitute_free(self.abstract_term_subst)
                 replaced = aterm_ori.calc_replace(term)
@@ -294,6 +333,10 @@ class ThibaultTui:
 
                 self.hl_path.remove(aterm_ori)
                 self.hl_subterm = replaced
+                self.log("REPLACE", ' '.join(map(str, replaced.path_i())))
+                self.log("LHS", lhs_str)
+                self.log("RHS", rhs_str)
+                self.log_term()
                 self.hl_path.add(self.hl_subterm)
                 self.cancel_subterm_mode(update_path = False)
                 self.aterm.notation.auto_split_lines(self.pp_width)
@@ -318,12 +361,20 @@ class ThibaultTui:
                     show_err(str(e))
                     # raise
 
+    def log(self, tag, data):
+        print(tag+': '+data, file = self.f)
+    def log_term(self):
+        self.log("TERM", self.aterm.term.to_str(bound_names = ('x',)))
+    def log_seq(self):
+        
+        self.log("SEQ", str(self.aterm.term))
+
 if __name__ == "__main__":
     import os
     import argparse
     os.environ['TERM'] = 'xterm-256color'
 
-    tenv = ThibaultEnv()
+    #tenv = ThibaultEnv()
     def make_term_motzkin():
         line = "B C D K L F F C L D G K D K L K E L A I E C K B C C D D G D K J K L F B L D A K K A B L D I E C K B C C D D G D K J E B B K L K E L A I E C K B C C D D G D K J D N J K L F A K K A B L D I E C K B C C D D G D K J E B J G B L J K E B L D K B B K K F K D C G D N"
         term = tenv.letters_to_seq_program(line.split())
@@ -400,8 +451,9 @@ if __name__ == "__main__":
                                          description='examinor of generated OEIS programs',
                                          formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     cmd_parser.add_argument("--num_eval", type=int, default = "20", help="Number of points wher the program gets evaluated")
-    cmd_parser.add_argument("--test", action = "store_true", default = False, help="Uses prepared program instead of reading from stdin")
+    cmd_parser.add_argument("fname", type=str, help="File with examined program")
+    #cmd_parser.add_argument("--test", action = "store_true", default = False, help="Uses prepared program instead of reading from stdin")
     config = cmd_parser.parse_args()
-    if config.test: program = make_term_A1136()
-    else: program = take_program_from_stdin()
-    curses.wrapper(ThibaultTui, tenv, program, config.num_eval)
+    #if config.test: program = make_term_A1136()
+    #else: program = take_program_from_stdin()
+    curses.wrapper(ThibaultTui, config.fname, config.num_eval)

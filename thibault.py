@@ -83,6 +83,7 @@ class ThibaultEnv:
         rewriter.add_extensionality(ax.ext_3_loop2)
         rewriter.add_extensionality(ax.ext_4_loop2)
         rewriter.add_extensionality(ax.ext_1_compr)
+        rewriter.add_extensionality(ax.ext_1_comprb)
         rewriter.add_extensionality(self.env.add_axiom("forall(x : BODY(x) = BODY2(x)) => let(A, x:BODY(x)) = let(A, x:BODY2(x))"))
         rewriter.add_extensionality(self.env.add_axiom("forall(x : BODY(x) = BODY2(x)) => sum(A, x:BODY(x)) = sum(A, x:BODY2(x))"))
         rewriter.add_extensionality(self.env.add_axiom("forall(x : BODY(x) = BODY2(x)) => prod(A, x:BODY(x)) = prod(A, x:BODY2(x))"))

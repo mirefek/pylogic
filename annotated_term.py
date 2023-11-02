@@ -20,7 +20,7 @@ class ATNotation:
 
     @property
     def term(self):
-        return self.aterm.term
+        return self.aterm.term        
 
     def build_function_syntax(self):
         self.bracketed = False
@@ -225,6 +225,15 @@ class AnnotatedTerm:
         while x is not None:
             yield x
             x = x.parent
+
+    def path_i(self):
+        res = []
+        x = self
+        while x.parent is not None:
+            res.append(x.parent_i)
+            x = x.parent
+        res.reverse()
+        return res
 
     def add_notation(self):
         self.notation = ATNotation(self)

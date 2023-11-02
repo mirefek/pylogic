@@ -93,6 +93,8 @@ Axiom ext_4_loop2 : forall(x: forall(y: forall(z: BODY(x,y,z) = BODY2(x,y,z))))
   => loop2(A,B,C, x:y:z:BODY0(x,y,z), x:y:z:BODY(x,y,z)) = loop2(A,B,C, x:y:z:BODY0(x,y,z), x:y:z:BODY2(x,y,z))
 Axiom ext_1_compr : forall(x: BODY(x) = BODY2(x))
   => compr(A, x:BODY(x)) = compr(A, x:BODY2(x))
+Axiom ext_1_comprb : forall(x: PRED(x) = PRED2(x))
+  => comprb(A, x:PRED(x)) = comprb(A, x:PRED2(x))
 
 # introduction of default local facts
 
@@ -194,3 +196,4 @@ Axiom cheat_simp_power_times_to_plus : A^B * A^C = A^(B+C)
 Axiom cheat_simp_cancel_times_floordiv : A*(X//A) + X%A = X
 Axiom cheat_simp_triunpack0: tri_unpack0(y + (X^2+X)//2) = y
 Axiom cheat_simp_triunpack1: tri_unpack1(y + (X^2+X)//2) = X-y
+Axiom cheat_simp_compr: compr(A, x:BODY(x)) = comprb(A, x:BODY(x) <= 0)
