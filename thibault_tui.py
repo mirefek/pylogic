@@ -379,6 +379,14 @@ if __name__ == "__main__":
         term = tenv.env.rewriter.run(term, simp_rewriter, repeat = True).term[1]
         return term
 
+    def make_term_A1136():
+        code = """
+        comprb(x, c :
+          (c % 6 = 1 && c in primes)
+          && loop(c // 6 - 1, 2, b : d : (if b = 1 ; 3 else 2 * b) % c) = 1)
+        """
+        return tenv.env.parser.parse_str(code)
+
     def take_program_from_stdin():
         import sys
         print("Input a program in the letters format")
@@ -394,6 +402,6 @@ if __name__ == "__main__":
     cmd_parser.add_argument("--num_eval", type=int, default = "20", help="Number of points wher the program gets evaluated")
     cmd_parser.add_argument("--test", action = "store_true", default = False, help="Uses prepared program instead of reading from stdin")
     config = cmd_parser.parse_args()
-    if config.test: program = make_term_imerps()
+    if config.test: program = make_term_A1136()
     else: program = take_program_from_stdin()
     curses.wrapper(ThibaultTui, tenv, program, config.num_eval)

@@ -23,6 +23,7 @@ class ATNotation:
         return self.aterm.term
 
     def build_function_syntax(self):
+        self.bracketed = False
         self.parts.append(self.term.f.name)
         if self.term.f.arity == 0: return
         self.spaces.append('')
@@ -37,8 +38,8 @@ class ATNotation:
         self.parts.append(')')
 
     def build_operator_syntax(self):
-        bracketed = self.check_bracket_necesity()
-        if bracketed:
+        self.bracketed = self.check_bracket_necesity()
+        if self.bracketed:
             self.parts.append('(')
             self.spaces.append('')
 
@@ -53,7 +54,7 @@ class ATNotation:
                 self._add_subterm(self.aterm.subterms[arg_i])
             else: self.parts.append(elem)
 
-        if bracketed:
+        if self.bracketed:
             self.spaces.append('')
             self.parts.append(')')
 
@@ -77,11 +78,11 @@ class ATNotation:
         if parent_rule is None: return False
         parent_i = parent.arg_i_to_part_i[self.aterm.parent_i]
 
-        if parent_i == len(parent.parts)-1: # parent_rule left
+        if parent_i == len(parent.parts)-1-int(parent.bracketed): # parent_rule left
             if isinstance(rule.elements[0], str): return False
             if not parent_rule.compatible_inner(rule): return True
 
-        elif parent_i == 0: # parent_rule right
+        elif parent_i == int(parent.bracketed): # parent_rule right
             if isinstance(rule.elements[-1], str): return False
             if rule.compatible_inner(parent_rule): return True
             if not rule.compatible_outer(parent_rule): return True
@@ -398,6 +399,9 @@ loop(y, prod(1 .. X - y, z : z + y), a : b :
     // factorial(X - y)
   - x)
 """)
+    term = env.parser.parse_str("""
+    5 + ((if true; 0 else 1) + 2)
+    """)
     aterm = AnnotatedTerm(term)
     print(term)
     aterm.add_notation()
